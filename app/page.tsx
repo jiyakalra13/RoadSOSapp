@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback } from "react"
 import { BottomNav } from "@/components/bottom-nav"
 import { HomeDashboard } from "@/components/home-dashboard"
 import { SOSFlow } from "@/components/sos-flow"
@@ -17,7 +17,6 @@ import { useLocation } from "@/hooks/use-location"
 import { useUserProfile } from "@/hooks/use-user-profile"
 import { useNetworkStatus } from "@/hooks/use-network-status"
 import { useSmartSOSTriggers } from "@/hooks/use-smart-sos-triggers"
-import { useEmergencySMS, saveLastKnownLocation, getLastKnownLocation } from "@/hooks/use-emergency-sms"
 
 type ActiveView = 
   | "home" 
@@ -60,10 +59,6 @@ export default function RoadSOSApp() {
     maximumAge: 0
   })
 
-  // Emergency SMS functionality for volume button trigger
-  const { sendToAllContacts, getShareableMessage } = useEmergencySMS()
-  const hasTriggeredVolumeSOS = useRef(false)
-
   // Helper to initiate ambulance call
   const callAmbulance = useCallback(() => {
     const numbers = getEmergencyNumbers()
@@ -74,52 +69,21 @@ export default function RoadSOSApp() {
   const handleSmartTrigger = useCallback((triggerType: "voice" | "volume" | "crash") => {
     if (sosActive) return // Don't trigger if SOS is already active
     
-    // For volume button trigger (3 quick presses), directly:
-    // 1. Activate SOS
-    // 2. Share live location to emergency contacts
-    // 3. Call ambulance
+    // For volume button trigger, directly activate SOS and call ambulance
     if (triggerType === "volume") {
-      if (hasTriggeredVolumeSOS.current) return // Prevent double trigger
-      hasTriggeredVolumeSOS.current = true
-      
       setSOSActive(true)
       setAutoCalledAmbulance(true)
-      
-      // Get current location data
-      const currentLocation = gpsLocation 
-        ? { lat: gpsLocation.lat, lng: gpsLocation.lng, address: gpsLocation.address }
-        : null
-      
-      // Save location for offline use
-      if (currentLocation) {
-        saveLastKnownLocation(currentLocation)
-      }
-      
-      // Get emergency contacts from profile
-      const emergencyContacts = profile?.emergencyContacts || []
-      
-      // Share location to all emergency contacts immediately
-      if (emergencyContacts.length > 0) {
-        sendToAllContacts(
-          emergencyContacts,
-          currentLocation,
-          isOnline,
-          profile?.fullName
-        )
-      }
-      
-      // Call ambulance after a brief delay to allow location sharing to initiate
+      // Call ambulance after a brief delay to allow SOS flow to start
       setTimeout(() => {
         callAmbulance()
-      }, 800)
-      
+      }, 500)
       return
     }
     
     // For other triggers, show confirmation
     setSOSTriggerType(triggerType)
     setShowSOSConfirmation(true)
-  }, [sosActive, callAmbulance, gpsLocation, isOnline, profile, sendToAllContacts])
+  }, [sosActive, callAmbulance])
 
   // Smart SOS triggers (voice commands, volume button, crash detection)
   const { lastDetectedCommand } = useSmartSOSTriggers({
@@ -151,7 +115,6 @@ export default function RoadSOSApp() {
   const handleSOSCancel = () => {
     setSOSActive(false)
     setAutoCalledAmbulance(false)
-    hasTriggeredVolumeSOS.current = false
   }
 
   const handleSOSComplete = () => {
