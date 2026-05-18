@@ -32,6 +32,7 @@ export default function RoadSOSApp() {
   const [activeTab, setActiveTab] = useState("home")
   const [activeView, setActiveView] = useState<ActiveView>("home")
   const [sosActive, setSOSActive] = useState(false)
+  const [autoCalledAmbulance, setAutoCalledAmbulance] = useState(false)
   
   // Smart SOS trigger confirmation state
   const [showSOSConfirmation, setShowSOSConfirmation] = useState(false)
@@ -58,12 +59,31 @@ export default function RoadSOSApp() {
     maximumAge: 0
   })
 
+  // Helper to initiate ambulance call
+  const callAmbulance = useCallback(() => {
+    const numbers = getEmergencyNumbers()
+    window.location.href = `tel:${numbers.ambulance}`
+  }, [getEmergencyNumbers])
+
   // Smart SOS trigger handler
   const handleSmartTrigger = useCallback((triggerType: "voice" | "volume" | "crash") => {
     if (sosActive) return // Don't trigger if SOS is already active
+    
+    // For volume button trigger, directly activate SOS and call ambulance
+    if (triggerType === "volume") {
+      setSOSActive(true)
+      setAutoCalledAmbulance(true)
+      // Call ambulance after a brief delay to allow SOS flow to start
+      setTimeout(() => {
+        callAmbulance()
+      }, 500)
+      return
+    }
+    
+    // For other triggers, show confirmation
     setSOSTriggerType(triggerType)
     setShowSOSConfirmation(true)
-  }, [sosActive])
+  }, [sosActive, callAmbulance])
 
   // Smart SOS triggers (voice commands, volume button, crash detection)
   const { lastDetectedCommand } = useSmartSOSTriggers({
@@ -94,6 +114,7 @@ export default function RoadSOSApp() {
 
   const handleSOSCancel = () => {
     setSOSActive(false)
+    setAutoCalledAmbulance(false)
   }
 
   const handleSOSComplete = () => {
@@ -244,6 +265,7 @@ export default function RoadSOSApp() {
         emergencyContacts={profile?.emergencyContacts || []}
         isOnline={isOnline}
         userName={profile?.fullName}
+        autoCalledAmbulance={autoCalledAmbulance}
       />
 
       {/* Smart SOS Trigger Confirmation Overlay */}
