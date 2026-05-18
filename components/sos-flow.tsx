@@ -458,15 +458,21 @@ export function SOSFlow({
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5 mb-2"
+                  className="flex flex-col items-center gap-1.5 mb-2"
                 >
-                  <motion.div
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ duration: 1, repeat: Infinity }}
-                  >
-                    <Phone className="h-4 w-4" />
-                  </motion.div>
-                  <span className="text-xs font-medium">Calling Ambulance...</span>
+                  <div className="flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5">
+                    <motion.div
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 1, repeat: Infinity }}
+                    >
+                      <Phone className="h-4 w-4" />
+                    </motion.div>
+                    <span className="text-xs font-medium">Calling Ambulance...</span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-success/20 rounded-full px-3 py-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span className="text-[11px] font-medium">Location shared with contacts</span>
+                  </div>
                 </motion.div>
               )}
               
