@@ -83,7 +83,7 @@ function callPhone(phone: string) {
 export function NearbyServices({ serviceType, onBack, location }: NearbyServicesProps) {
   const config = serviceConfig[serviceType]
   const Icon = config.icon
-  const [viewMode, setViewMode] = useState<"map" | "list">("map")
+  const [viewMode, setViewMode] = useState<"map" | "list">("list")
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
   
   // Fetch real nearby places using user's GPS location
@@ -130,20 +130,20 @@ export function NearbyServices({ serviceType, onBack, location }: NearbyServices
           </div>
           <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
             <Button
-              variant={viewMode === "map" ? "default" : "ghost"}
-              size="icon"
-              onClick={() => setViewMode("map")}
-              className="h-6 w-6"
-            >
-              <Map className="h-3 w-3" />
-            </Button>
-            <Button
               variant={viewMode === "list" ? "default" : "ghost"}
               size="icon"
               onClick={() => setViewMode("list")}
               className="h-6 w-6"
             >
               <List className="h-3 w-3" />
+            </Button>
+            <Button
+              variant={viewMode === "map" ? "default" : "ghost"}
+              size="icon"
+              onClick={() => setViewMode("map")}
+              className="h-6 w-6"
+            >
+              <Map className="h-3 w-3" />
             </Button>
           </div>
         </div>
