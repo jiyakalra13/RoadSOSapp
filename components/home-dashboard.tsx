@@ -11,7 +11,10 @@ import {
   AlertTriangle,
   Loader2,
   RefreshCw,
-  Building2
+  Building2,
+  Phone,
+  Navigation,
+  ExternalLink
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Card } from "@/components/ui/card"
@@ -93,10 +96,15 @@ export function HomeDashboard({
   const nearestPolice = police[0]
   const nearestMechanic = mechanics[0]
 
-  // Helper functions
   const formatDistance = (km: number): string => {
     if (km < 1) return `${Math.round(km * 1000)} m`
     return `${km.toFixed(1)} km`
+  }
+
+  const formatEta = (km: number): string => {
+    const minutes = Math.round((km / 30) * 60) // Assume 30 km/h average speed
+    if (minutes < 1) return "< 1 min"
+    return `~${minutes} min`
   }
 
   const openGoogleMaps = (place: NearbyPlace) => {
@@ -109,8 +117,8 @@ export function HomeDashboard({
     window.open(url, "_blank")
   }
 
-  const callPhone = (phone: string) => {
-    window.location.href = `tel:${phone}`
+  const callPhone = (phone: string | undefined, defaultPhone: string) => {
+    window.location.href = `tel:${phone || defaultPhone}`
   }
 
   const handleSOSStart = () => {
@@ -208,105 +216,192 @@ export function HomeDashboard({
       {location && (
         <div className="mb-3 shrink-0">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-xs font-semibold text-foreground">Nearby Services</h2>
+            <h2 className="text-xs font-semibold text-foreground">Nearest Services</h2>
             {servicesLoading && (
               <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
             )}
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-2">
             {/* Nearest Hospital */}
             <Card 
               className={cn(
-                "p-2 border-border/50 cursor-pointer hover:bg-accent/50 transition-colors",
+                "p-2 border-border/50 transition-colors",
                 !nearestHospital && "opacity-50"
               )}
-              onClick={() => nearestHospital && onServiceSelect("ambulance")}
             >
-              <div className="flex items-center gap-1.5 mb-1">
-                <div className="h-5 w-5 rounded bg-emergency/10 flex items-center justify-center">
-                  <Building2 className="h-3 w-3 text-emergency" />
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-emergency/10 flex items-center justify-center shrink-0">
+                  <Building2 className="h-4 w-4 text-emergency" />
                 </div>
-                <span className="text-[10px] font-medium text-foreground truncate">Hospital</span>
-              </div>
-              {servicesLoading ? (
-                <p className="text-[10px] text-muted-foreground">Searching...</p>
-              ) : nearestHospital ? (
-                <div>
-                  <p className="text-[10px] text-muted-foreground truncate">{nearestHospital.name}</p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <MapPin className="h-2.5 w-2.5 text-muted-foreground" />
-                    <span className="text-[10px] font-medium text-primary">{formatDistance(nearestHospital.distance)}</span>
+                <div className="flex-1 min-w-0" onClick={() => nearestHospital && onServiceSelect("ambulance")}>
+                  {servicesLoading ? (
+                    <p className="text-[10px] text-muted-foreground">Searching hospitals...</p>
+                  ) : nearestHospital ? (
+                    <>
+                      <p className="text-[11px] font-medium text-foreground truncate">{nearestHospital.name}</p>
+                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                        <span className="flex items-center gap-0.5">
+                          <MapPin className="h-2.5 w-2.5" />
+                          {formatDistance(nearestHospital.distance)}
+                        </span>
+                        <span className="text-primary font-medium">{formatEta(nearestHospital.distance)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground">No hospital found nearby</p>
+                  )}
+                </div>
+                {nearestHospital && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 bg-emergency/10 hover:bg-emergency/20"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        callPhone(nearestHospital.phone, "911")
+                      }}
+                    >
+                      <Phone className="h-3.5 w-3.5 text-emergency" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 bg-primary/10 hover:bg-primary/20"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openGoogleMaps(nearestHospital)
+                      }}
+                    >
+                      <Navigation className="h-3.5 w-3.5 text-primary" />
+                    </Button>
                   </div>
-                </div>
-              ) : (
-                <p className="text-[10px] text-muted-foreground">None found</p>
-              )}
+                )}
+              </div>
             </Card>
 
             {/* Nearest Police */}
             <Card 
               className={cn(
-                "p-2 border-border/50 cursor-pointer hover:bg-accent/50 transition-colors",
+                "p-2 border-border/50 transition-colors",
                 !nearestPolice && "opacity-50"
               )}
-              onClick={() => nearestPolice && onServiceSelect("police")}
             >
-              <div className="flex items-center gap-1.5 mb-1">
-                <div className="h-5 w-5 rounded bg-indigo-500/10 flex items-center justify-center">
-                  <Shield className="h-3 w-3 text-indigo-500" />
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-indigo-500/10 flex items-center justify-center shrink-0">
+                  <Shield className="h-4 w-4 text-indigo-500" />
                 </div>
-                <span className="text-[10px] font-medium text-foreground truncate">Police</span>
-              </div>
-              {servicesLoading ? (
-                <p className="text-[10px] text-muted-foreground">Searching...</p>
-              ) : nearestPolice ? (
-                <div>
-                  <p className="text-[10px] text-muted-foreground truncate">{nearestPolice.name}</p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <MapPin className="h-2.5 w-2.5 text-muted-foreground" />
-                    <span className="text-[10px] font-medium text-primary">{formatDistance(nearestPolice.distance)}</span>
+                <div className="flex-1 min-w-0" onClick={() => nearestPolice && onServiceSelect("police")}>
+                  {servicesLoading ? (
+                    <p className="text-[10px] text-muted-foreground">Searching police stations...</p>
+                  ) : nearestPolice ? (
+                    <>
+                      <p className="text-[11px] font-medium text-foreground truncate">{nearestPolice.name}</p>
+                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                        <span className="flex items-center gap-0.5">
+                          <MapPin className="h-2.5 w-2.5" />
+                          {formatDistance(nearestPolice.distance)}
+                        </span>
+                        <span className="text-primary font-medium">{formatEta(nearestPolice.distance)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground">No police station found nearby</p>
+                  )}
+                </div>
+                {nearestPolice && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 bg-indigo-500/10 hover:bg-indigo-500/20"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        callPhone(nearestPolice.phone, "100")
+                      }}
+                    >
+                      <Phone className="h-3.5 w-3.5 text-indigo-500" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 bg-primary/10 hover:bg-primary/20"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openGoogleMaps(nearestPolice)
+                      }}
+                    >
+                      <Navigation className="h-3.5 w-3.5 text-primary" />
+                    </Button>
                   </div>
-                </div>
-              ) : (
-                <p className="text-[10px] text-muted-foreground">None found</p>
-              )}
+                )}
+              </div>
             </Card>
 
             {/* Nearest Mechanic */}
             <Card 
               className={cn(
-                "p-2 border-border/50 cursor-pointer hover:bg-accent/50 transition-colors",
+                "p-2 border-border/50 transition-colors",
                 !nearestMechanic && "opacity-50"
               )}
-              onClick={() => nearestMechanic && onServiceSelect("vehicle")}
             >
-              <div className="flex items-center gap-1.5 mb-1">
-                <div className="h-5 w-5 rounded bg-blue-500/10 flex items-center justify-center">
-                  <Car className="h-3 w-3 text-blue-500" />
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+                  <Car className="h-4 w-4 text-blue-500" />
                 </div>
-                <span className="text-[10px] font-medium text-foreground truncate">Mechanic</span>
-              </div>
-              {servicesLoading ? (
-                <p className="text-[10px] text-muted-foreground">Searching...</p>
-              ) : nearestMechanic ? (
-                <div>
-                  <p className="text-[10px] text-muted-foreground truncate">{nearestMechanic.name}</p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <MapPin className="h-2.5 w-2.5 text-muted-foreground" />
-                    <span className="text-[10px] font-medium text-primary">{formatDistance(nearestMechanic.distance)}</span>
+                <div className="flex-1 min-w-0" onClick={() => nearestMechanic && onServiceSelect("vehicle")}>
+                  {servicesLoading ? (
+                    <p className="text-[10px] text-muted-foreground">Searching mechanics...</p>
+                  ) : nearestMechanic ? (
+                    <>
+                      <p className="text-[11px] font-medium text-foreground truncate">{nearestMechanic.name}</p>
+                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                        <span className="flex items-center gap-0.5">
+                          <MapPin className="h-2.5 w-2.5" />
+                          {formatDistance(nearestMechanic.distance)}
+                        </span>
+                        <span className="text-primary font-medium">{formatEta(nearestMechanic.distance)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground">No mechanic found nearby</p>
+                  )}
+                </div>
+                {nearestMechanic && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 bg-blue-500/10 hover:bg-blue-500/20"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        callPhone(nearestMechanic.phone, "555-AUTO")
+                      }}
+                    >
+                      <Phone className="h-3.5 w-3.5 text-blue-500" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 bg-primary/10 hover:bg-primary/20"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openGoogleMaps(nearestMechanic)
+                      }}
+                    >
+                      <Navigation className="h-3.5 w-3.5 text-primary" />
+                    </Button>
                   </div>
-                </div>
-              ) : (
-                <p className="text-[10px] text-muted-foreground">None found</p>
-              )}
+                )}
+              </div>
             </Card>
           </div>
         </div>
       )}
 
       {/* SOS Button */}
-      <div className="flex-1 flex flex-col items-center justify-center">
-        <p className="text-xs text-muted-foreground mb-3">Hold for emergency SOS</p>
+      <div className="flex-1 flex flex-col items-center justify-center min-h-0">
+        <p className="text-[10px] text-muted-foreground mb-2">Hold for emergency SOS</p>
         
         <div className="relative">
           <AnimatePresence>
@@ -336,47 +431,47 @@ export function HomeDashboard({
             onTouchEnd={handleSOSEnd}
             whileTap={{ scale: 0.95 }}
             className={cn(
-              "relative h-32 w-32 rounded-full flex flex-col items-center justify-center",
+              "relative h-24 w-24 rounded-full flex flex-col items-center justify-center",
               "bg-gradient-to-br from-emergency to-red-700",
               "text-emergency-foreground shadow-2xl",
               "transition-all duration-200",
               sosPressed && "shadow-emergency/50"
             )}
           >
-            <svg className="absolute inset-0 -rotate-90" viewBox="0 0 128 128">
+            <svg className="absolute inset-0 -rotate-90" viewBox="0 0 96 96">
               <circle
-                cx="64"
-                cy="64"
-                r="60"
+                cx="48"
+                cy="48"
+                r="44"
                 fill="none"
                 stroke="rgba(255,255,255,0.2)"
                 strokeWidth="4"
               />
               <circle
-                cx="64"
-                cy="64"
-                r="60"
+                cx="48"
+                cy="48"
+                r="44"
                 fill="none"
                 stroke="white"
                 strokeWidth="4"
-                strokeDasharray="377"
-                strokeDashoffset={377 - (377 * pressProgress) / 100}
+                strokeDasharray="276"
+                strokeDashoffset={276 - (276 * pressProgress) / 100}
                 strokeLinecap="round"
                 className="transition-all duration-100"
               />
             </svg>
             
-            <AlertTriangle className="h-10 w-10 mb-1" />
-            <span className="text-xl font-bold tracking-wider">SOS</span>
+            <AlertTriangle className="h-8 w-8 mb-0.5" />
+            <span className="text-lg font-bold tracking-wider">SOS</span>
             {sosPressed && (
-              <span className="text-xs mt-0.5 opacity-80">
+              <span className="text-[10px] mt-0.5 opacity-80">
                 {Math.ceil((100 - pressProgress) / 100)}s
               </span>
             )}
           </motion.button>
         </div>
         
-        <p className="text-xs text-muted-foreground mt-3 text-center">
+        <p className="text-[10px] text-muted-foreground mt-2 text-center">
           Hold 1 second to trigger alert
         </p>
       </div>
