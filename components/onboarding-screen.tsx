@@ -155,6 +155,9 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
   }
 
   const nextStep = () => {
+    if (step === "emergency" && newContact.name && newContact.phone && newContact.relationship) {
+      addEmergencyContact()
+    }
     const currentIndex = steps.indexOf(step)
     if (currentIndex < steps.length - 1) {
       setStep(steps[currentIndex + 1])
