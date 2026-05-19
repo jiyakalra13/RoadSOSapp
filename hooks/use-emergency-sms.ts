@@ -104,9 +104,9 @@ ${name} is still in emergency.
 }
 
 // Generate SMS URL for mobile devices
-function generateSmsUrl(phone: string, message: string): string {
-  // Clean phone number
-  const cleanPhone = phone.replace(/[^\d+]/g, "")
+function generateSmsUrl(phones: string[], message: string): string {
+  // Clean phone numbers and join with comma (works for both iOS and Android generally)
+  const cleanPhones = phones.map(p => p.replace(/[^\d+]/g, "")).join(",")
   
   // Encode message for URL
   const encodedMessage = encodeURIComponent(message)
@@ -114,12 +114,12 @@ function generateSmsUrl(phone: string, message: string): string {
   // Use different format based on device
   // iOS uses &body=, Android uses ?body=
   // Using the more universal format that works on both
-  return `sms:${cleanPhone}?body=${encodedMessage}`
+  return `sms:${cleanPhones}?body=${encodedMessage}`
 }
 
 // Open SMS app with pre-filled message
-function openSmsApp(phone: string, message: string): void {
-  const url = generateSmsUrl(phone, message)
+function openSmsApp(phones: string[], message: string): void {
+  const url = generateSmsUrl(phones, message)
   window.location.href = url
 }
 
@@ -243,7 +243,13 @@ export function useEmergencySMS() {
 
       const message = formatLocationMessage(locationToSend, isLive, userName, medicalInfo)
       
-      await sendSmsToContacts(contacts, locationToSend, isLive, userName, message, handleStatusUpdate)
+      if (!isOnline) {
+        // Trigger offline fallback
+        const phoneNumbers = contacts.map(c => c.phone)
+        openSmsApp(phoneNumbers, message)
+      } else {
+        await sendSmsToContacts(contacts, locationToSend, isLive, userName, message, handleStatusUpdate)
+      }
       
       setIsSending(false)
     },
