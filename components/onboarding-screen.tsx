@@ -90,7 +90,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
       }
       updateField("emergencyContacts", [...(formData.emergencyContacts || []), contact])
       
-      // Fire off welcome SMS asynchronously
+      // Fire off welcome SMS natively
       const notifyContact = async () => {
         let lat, lng;
         if (typeof window !== "undefined" && navigator.geolocation) {
@@ -105,20 +105,15 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
           }
         }
         
-        try {
-          await fetch('/api/sos/notify-contact', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contactName: contact.name,
-              contactPhone: contact.phone,
-              userName: formData.fullName || "Someone",
-              location: (lat && lng) ? { lat, lng } : null
-            })
-          });
-        } catch (error) {
-          console.error("Failed to notify contact", error);
+        const cleanPhone = contact.phone.replace(/[^\d+]/g, "");
+        const userName = formData.fullName || "Someone";
+        let message = `Hi ${contact.name}, ${userName} has added you as an emergency contact in the RoadSOS safety app.`;
+        if (lat && lng) {
+          message += `\nCurrent Location: https://maps.google.com/?q=${lat},${lng}`;
         }
+        
+        // Pop open native SMS app
+        window.location.href = `sms:${cleanPhone}?body=${encodeURIComponent(message)}`;
       };
       notifyContact();
       

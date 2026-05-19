@@ -260,33 +260,11 @@ export function SOSFlow({
       await new Promise((r) => setTimeout(r, 800))
       setStepStatus((s) => ({ ...s, detecting: "complete", sharing: "loading" }))
       
-      // Send SMS to emergency contacts
-      if (emergencyContacts.length > 0 && !hasSentInitialSmsRef.current) {
-        hasSentInitialSmsRef.current = true
-        
-        // Determine location to send
-        let locationToSend = location ? { lat: location.lat, lng: location.lng, address } : null
-        
-        // In offline mode, use last known location
-        if (!isOnline || !locationToSend) {
-          const lastKnown = getLastKnownLocation()
-          if (lastKnown) {
-            locationToSend = lastKnown
-          }
-        }
-        
-        // Send SMS
-        await sendToAllContactsRef.current(
-          emergencyContacts,
-          locationToSend,
-          isOnline,
-          userName,
-          { bloodGroup, conditions: medicalConditions, allergies }
-        )
-        setSmsSent(true)
-        if (locationToSend) {
-          setLastSentLocation({ lat: locationToSend.lat, lng: locationToSend.lng })
-        }
+      // SMS will now be triggered manually by the user via a button on the active SOS screen.
+      // We skip the automatic background sending.
+      if (emergencyContacts.length > 0) {
+        // Just advance the UI state for the animations
+        setSmsSent(false)
       }
       
       await new Promise((r) => setTimeout(r, 1000))
@@ -750,6 +728,32 @@ export function SOSFlow({
                     ))}
                   </div>
                 </div>
+              )}
+
+              {emergencyContacts.length > 0 && (
+                <Button
+                  size="lg"
+                  onClick={() => {
+                    let locationToSend = location ? { lat: location.lat, lng: location.lng, address } : null
+                    if (!isOnline || !locationToSend) {
+                      const lastKnown = getLastKnownLocation()
+                      if (lastKnown) {
+                        locationToSend = lastKnown
+                      }
+                    }
+                    sendToAllContactsRef.current(
+                      emergencyContacts,
+                      locationToSend,
+                      isOnline,
+                      userName,
+                      { bloodGroup, conditions: medicalConditions, allergies }
+                    )
+                  }}
+                  className="bg-white text-destructive hover:bg-white/90 mt-2 w-full max-w-xs font-bold text-lg h-14 uppercase tracking-wider"
+                >
+                  <MessageSquare className="h-5 w-5 mr-2" />
+                  SHARE VIA SMS
+                </Button>
               )}
               
               <Button
