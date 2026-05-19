@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server"
 import fs from "fs"
 import path from "path"
-import twilio from "twilio"
-
-// Initialize Twilio client
-// Requires TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in your .env or Render environment
-const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
-  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-  : null;
 
 export async function POST(request: Request) {
   try {
@@ -34,29 +27,51 @@ export async function POST(request: Request) {
     console.log(`Time: ${alertData.time}`)
     
     if (alertData.messageBody) {
-      if (twilioClient && process.env.TWILIO_PHONE_NUMBER) {
-        console.log(`\n--- SENDING REAL SMS VIA TWILIO TO ${contacts?.length || 0} CONTACTS ---`)
+      const apiKey = process.env.FAST2SMS_API_KEY;
+      if (apiKey) {
+        console.log(`\n--- SENDING REAL SMS VIA FAST2SMS TO ${contacts?.length || 0} CONTACTS ---`)
         
-        // Loop through all contacts and send the SMS
-        const sendPromises = contacts.map((contact: any) => {
-          return twilioClient.messages.create({
-            body: alertData.messageBody,
-            from: process.env.TWILIO_PHONE_NUMBER,
-            to: contact.phone // Ensure phone numbers are in E.164 format (e.g., +1234567890)
-          }).then(message => {
-            console.log(`Twilio Success: Message sent to ${contact.name} (SID: ${message.sid})`);
-          }).catch(error => {
-            console.error(`Twilio Error sending to ${contact.name}:`, error);
-          });
-        });
-        
-        // Wait for all messages to send (or fail)
-        await Promise.all(sendPromises);
+        // Extract 10-digit phone numbers and join by comma
+        const numbers = contacts
+          .map((c: any) => c.phone.replace(/[^0-9]/g, '').slice(-10))
+          .filter((n: string) => n.length === 10)
+          .join(",");
+
+        if (numbers.length > 0) {
+          try {
+            const response = await fetch("https://www.fast2sms.com/dev/bulkV2", {
+              method: "POST",
+              headers: {
+                "authorization": apiKey,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                route: "v3",
+                sender_id: "TXTIND",
+                message: alertData.messageBody,
+                language: "english",
+                flash: 0,
+                numbers: numbers
+              })
+            });
+
+            const data = await response.json();
+            if (data.return) {
+              console.log(`Fast2SMS Success:`, data);
+            } else {
+              console.error(`Fast2SMS Error:`, data);
+            }
+          } catch (error) {
+            console.error(`Fast2SMS Network Error:`, error);
+          }
+        } else {
+          console.log(`Fast2SMS Warning: No valid 10-digit Indian phone numbers found.`);
+        }
         console.log(`--------------------------------------------------\n`)
       } else {
-        // Fallback simulation if Twilio is not configured
+        // Fallback simulation if Fast2SMS is not configured
         console.log(`\n--- SIMULATED SMS SENT TO ${contacts?.length || 0} CONTACTS ---`)
-        console.log(`[!] TWILIO KEYS NOT FOUND. Showing simulated message below:`)
+        console.log(`[!] FAST2SMS_API_KEY NOT FOUND. Showing simulated message below:`)
         console.log(alertData.messageBody)
         console.log(`--------------------------------------------------\n`)
       }
