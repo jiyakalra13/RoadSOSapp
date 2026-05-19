@@ -42,6 +42,7 @@ interface SOSFlowProps {
   emergencyContacts?: Array<{ id: string; name: string; phone: string; relationship: string }>
   isOnline?: boolean
   userName?: string
+  autoCalledAmbulance?: boolean
 }
 
 type SOSStep = "countdown" | "sending" | "active"
@@ -65,7 +66,8 @@ export function SOSFlow({
   emergencyNumbers = { police: "911", ambulance: "911", fire: "911" },
   emergencyContacts = [],
   isOnline = true,
-  userName
+  userName,
+  autoCalledAmbulance = false
 }: SOSFlowProps) {
   const [step, setStep] = useState<SOSStep>("countdown")
   const [countdown, setCountdown] = useState(5)
@@ -450,6 +452,23 @@ export function SOSFlow({
               </div>
               
               <h2 className="text-xl font-bold mb-1">Help is coming</h2>
+              
+              {/* Auto-called ambulance indicator */}
+              {autoCalledAmbulance && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5 mb-2"
+                >
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                  >
+                    <Phone className="h-4 w-4" />
+                  </motion.div>
+                  <span className="text-xs font-medium">Calling Ambulance...</span>
+                </motion.div>
+              )}
               
               {/* SMS Status */}
               {smsSent && emergencyContacts.length > 0 && (
