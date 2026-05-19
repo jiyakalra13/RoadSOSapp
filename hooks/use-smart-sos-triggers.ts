@@ -116,6 +116,8 @@ export function useSmartSOSTriggers({
   const shouldListenRef = useRef(false)
   const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const hasRequestedMicRef = useRef(false)
+  const consecutiveErrorsRef = useRef(0)
+  const maxConsecutiveErrors = 3 // Stop trying after 3 consecutive errors
 
   // Keep trigger ref updated
   useEffect(() => {
@@ -212,6 +214,7 @@ export function useSmartSOSTriggers({
     recognition.onstart = () => {
       console.log("[v0] Voice recognition started - listening for commands")
       setIsVoiceListening(true)
+      consecutiveErrorsRef.current = 0 // Reset error counter on successful start
     }
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -233,13 +236,18 @@ export function useSmartSOSTriggers({
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.log("[v0] Voice recognition error:", event.error)
+      consecutiveErrorsRef.current++
+      
       // Don't set listening to false on no-speech errors, just restart
       if (event.error !== "no-speech" && event.error !== "aborted") {
         setIsVoiceListening(false)
       }
-      // If permission denied, request it
+      
+      // If permission denied or too many errors, stop trying to restart
       if (event.error === "not-allowed") {
-        requestMicrophonePermission()
+        shouldListenRef.current = false // Stop restart loop
+        setMicPermission("denied")
+        console.log("[v0] Microphone permission denied - stopping voice recognition")
       }
     }
 
@@ -250,47 +258,44 @@ export function useSmartSOSTriggers({
       if (restartTimeoutRef.current) {
         clearTimeout(restartTimeoutRef.current)
       }
-      // Auto-restart if still enabled and should be listening
-      if (shouldListenRef.current && settings.voiceCommandEnabled && enabled) {
+      // Auto-restart if still enabled, should be listening, and haven't hit error limit
+      if (shouldListenRef.current && settings.voiceCommandEnabled && enabled && consecutiveErrorsRef.current < maxConsecutiveErrors) {
         restartTimeoutRef.current = setTimeout(() => {
           try {
             console.log("[v0] Restarting voice recognition...")
             recognition.start()
           } catch (e) {
             console.log("[v0] Restart error:", e)
-            // If failed due to permission, request it
-            requestMicrophonePermission().then(granted => {
-              if (granted) {
-                try {
-                  recognition.start()
-                } catch {
-                  // Ignore
-                }
-              }
-            })
+            consecutiveErrorsRef.current++
+            // Stop trying if we've hit the error limit
+            if (consecutiveErrorsRef.current >= maxConsecutiveErrors) {
+              console.log("[v0] Too many consecutive errors, stopping voice recognition")
+              shouldListenRef.current = false
+            }
           }
         }, 300)
+      } else if (consecutiveErrorsRef.current >= maxConsecutiveErrors) {
+        console.log("[v0] Stopping voice recognition due to repeated errors")
       }
     }
 
     recognitionRef.current = recognition
 
-    // Auto-start voice recognition
+    // Auto-start voice recognition only if we have permission or haven't been denied
     const startRecognition = async () => {
+      // Don't start if permission was already denied
+      if (micPermission === "denied") {
+        console.log("[v0] Skipping voice recognition - microphone permission denied")
+        shouldListenRef.current = false
+        return
+      }
+      
       try {
         console.log("[v0] Starting voice recognition...")
         recognition.start()
       } catch (e) {
         console.log("[v0] Initial start error:", e)
-        // Request microphone permission and try again
-        const granted = await requestMicrophonePermission()
-        if (granted) {
-          try {
-            recognition.start()
-          } catch {
-            // Ignore secondary errors
-          }
-        }
+        consecutiveErrorsRef.current++
       }
     }
 
