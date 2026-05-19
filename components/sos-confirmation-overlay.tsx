@@ -40,7 +40,7 @@ export function SOSConfirmationOverlay({
 
   // Determine countdown time based on trigger type
   const getCountdownTime = useCallback(() => {
-    if (triggerType === "volume") return 5
+    if (triggerType === "volume" || triggerType === "voice") return 5
     if (triggerType === "crash") return autoConfirmDelay
     return autoConfirmDelay
   }, [triggerType, autoConfirmDelay])
@@ -56,9 +56,9 @@ export function SOSConfirmationOverlay({
     }
   }, [isVisible, getCountdownTime, stopEffects])
 
-  // Start/stop effects based on visibility and trigger type (volume or crash)
+  // Start/stop effects based on visibility and trigger type (volume, voice, or crash)
   useEffect(() => {
-    if (isVisible && (triggerType === "volume" || triggerType === "crash")) {
+    if (isVisible && (triggerType === "volume" || triggerType === "crash" || triggerType === "voice")) {
       startEffects()
     } else {
       stopEffects()
@@ -69,23 +69,23 @@ export function SOSConfirmationOverlay({
     }
   }, [isVisible, triggerType, startEffects, stopEffects])
 
-  // Play beep on countdown change for volume trigger
+  // Play beep on countdown change for volume or voice trigger
   useEffect(() => {
-    if (isVisible && triggerType === "volume" && countdown > 0) {
+    if (isVisible && (triggerType === "volume" || triggerType === "voice") && countdown > 0) {
       playBeep()
     }
   }, [countdown, isVisible, triggerType, playBeep])
 
-  // Auto-confirm countdown for volume and crash triggers
+  // Auto-confirm countdown for volume, voice, and crash triggers
   useEffect(() => {
-    if (!isVisible || overlayState !== "countdown" || (triggerType !== "crash" && triggerType !== "volume")) return
+    if (!isVisible || overlayState !== "countdown" || (triggerType !== "crash" && triggerType !== "volume" && triggerType !== "voice")) return
 
     const timer = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
           clearInterval(timer)
-          // For volume trigger, directly call ambulance and show help screen
-          if (triggerType === "volume" && !hasCalledRef.current) {
+          // For volume or voice trigger, directly call ambulance and show help screen
+          if ((triggerType === "volume" || triggerType === "voice") && !hasCalledRef.current) {
             hasCalledRef.current = true
             stopEffects()
             // Directly call ambulance
@@ -113,7 +113,7 @@ export function SOSConfirmationOverlay({
   // Handle manual confirm
   const handleConfirm = useCallback(() => {
     stopEffects()
-    if (triggerType === "volume") {
+    if (triggerType === "volume" || triggerType === "voice") {
       // Directly call ambulance on confirm
       window.location.href = `tel:${emergencyNumbers.ambulance}`
       // Switch to help on way screen
@@ -157,9 +157,7 @@ export function SOSConfirmationOverlay({
   const getTriggerDescription = useCallback(() => {
     switch (triggerType) {
       case "voice":
-        return detectedCommand 
-          ? `Heard: "${detectedCommand}"`
-          : "Emergency voice command detected"
+        return `Calling ambulance in ${countdown}s`
       case "volume":
         return `Calling ambulance in ${countdown}s`
       case "crash":
@@ -167,10 +165,10 @@ export function SOSConfirmationOverlay({
       default:
         return "Emergency trigger activated"
     }
-  }, [triggerType, detectedCommand, countdown])
+  }, [triggerType, countdown])
 
   // Get countdown duration for progress bar
-  const countdownDuration = triggerType === "volume" ? 5 : autoConfirmDelay
+  const countdownDuration = (triggerType === "volume" || triggerType === "voice") ? 5 : autoConfirmDelay
 
   return (
     <AnimatePresence>
@@ -286,8 +284,8 @@ export function SOSConfirmationOverlay({
             </motion.div>
           ) : (
             <>
-              {/* Flashing background for volume trigger */}
-              {triggerType === "volume" && (
+              {/* Flashing background for volume or voice trigger */}
+              {(triggerType === "volume" || triggerType === "voice") && (
                 <motion.div
                   animate={{
                     backgroundColor: ["rgba(239,68,68,0.3)", "rgba(239,68,68,0.1)", "rgba(239,68,68,0.3)"],
@@ -325,8 +323,8 @@ export function SOSConfirmationOverlay({
                   <h2 className="text-lg font-bold">{getTriggerTitle()}</h2>
                   <p className="text-sm opacity-90">{getTriggerDescription()}</p>
                   
-                  {/* Large countdown display for volume trigger */}
-                  {triggerType === "volume" && (
+                  {/* Large countdown display for volume or voice trigger */}
+                  {(triggerType === "volume" || triggerType === "voice") && (
                     <motion.div 
                       className="mt-3 flex items-center justify-center"
                       animate={{ scale: [1, 1.05, 1] }}
@@ -373,7 +371,7 @@ export function SOSConfirmationOverlay({
 
                 {/* Content */}
                 <div className="p-4 space-y-3">
-                  {triggerType === "volume" ? (
+                  {(triggerType === "volume" || triggerType === "voice") ? (
                     <>
                       <div className="flex items-center justify-center gap-2 text-emergency">
                         <Phone className="h-4 w-4" />
@@ -412,7 +410,7 @@ export function SOSConfirmationOverlay({
                     >
                       Cancel
                     </Button>
-                    {triggerType === "volume" ? (
+                    {(triggerType === "volume" || triggerType === "voice") ? (
                       <Button
                         onClick={handleConfirm}
                         className="flex-1 h-12 bg-emergency hover:bg-emergency/90 text-white text-base font-semibold"
@@ -436,6 +434,8 @@ export function SOSConfirmationOverlay({
                       ? "Tap Cancel if you are okay"
                       : triggerType === "volume"
                       ? "Volume button pressed 3 times"
+                      : triggerType === "voice"
+                      ? "Voice command detected"
                       : "This will alert emergency services and contacts"
                     }
                   </p>
