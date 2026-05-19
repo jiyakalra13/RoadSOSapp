@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { AlertTriangle, X, Mic, Car, Ambulance, Phone, CheckCircle2, MapPin, Shield } from "lucide-react"
+import { AlertTriangle, X, Mic, Car, Ambulance, Phone, CheckCircle2, MapPin, Shield, User, Heart, Pill, AlertCircle, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useSOSEffects } from "@/hooks/use-sos-effects"
 
@@ -16,6 +16,12 @@ interface SOSConfirmationOverlayProps {
   onCancel: () => void
   autoConfirmDelay?: number // Auto-confirm after X seconds (for crash detection)
   emergencyNumbers?: { ambulance: string }
+  // User profile info for display
+  userName?: string
+  bloodGroup?: string
+  medicalConditions?: string
+  allergies?: string
+  emergencyContacts?: Array<{ id: string; name: string; phone: string; relationship: string }>
 }
 
 export function SOSConfirmationOverlay({
@@ -25,11 +31,18 @@ export function SOSConfirmationOverlay({
   onConfirm,
   onCancel,
   autoConfirmDelay = 10,
-  emergencyNumbers = { ambulance: "911" }
+  emergencyNumbers = { ambulance: "911" },
+  userName,
+  bloodGroup,
+  medicalConditions,
+  allergies,
+  emergencyContacts = []
 }: SOSConfirmationOverlayProps) {
   const [countdown, setCountdown] = useState(5)
   const [overlayState, setOverlayState] = useState<OverlayState>("countdown")
+  const [showDetails, setShowDetails] = useState(false)
   const hasCalledRef = useRef(false)
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null)
   
   // SOS sound and vibration effects
   const { startEffects, stopEffects, playBeep } = useSOSEffects({
@@ -50,11 +63,55 @@ export function SOSConfirmationOverlay({
     if (isVisible) {
       setCountdown(getCountdownTime())
       setOverlayState("countdown")
+      setShowDetails(false)
       hasCalledRef.current = false
     } else {
       stopEffects()
     }
   }, [isVisible, getCountdownTime, stopEffects])
+
+  // Wake Lock - Keep screen on during confirmation overlay
+  useEffect(() => {
+    const requestWakeLock = async () => {
+      if (isVisible && 'wakeLock' in navigator) {
+        try {
+          wakeLockRef.current = await navigator.wakeLock.request('screen')
+        } catch {
+          // Wake lock request failed - silently ignore
+        }
+      }
+    }
+
+    const releaseWakeLock = async () => {
+      if (wakeLockRef.current) {
+        try {
+          await wakeLockRef.current.release()
+          wakeLockRef.current = null
+        } catch {
+          // Ignore release errors
+        }
+      }
+    }
+
+    if (isVisible) {
+      requestWakeLock()
+    } else {
+      releaseWakeLock()
+    }
+
+    const handleVisibilityChange = () => {
+      if (isVisible && document.visibilityState === 'visible') {
+        requestWakeLock()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      releaseWakeLock()
+    }
+  }, [isVisible])
 
   // Start/stop effects based on visibility and trigger type (volume, voice, or crash)
   useEffect(() => {
@@ -439,6 +496,94 @@ export function SOSConfirmationOverlay({
                       : "This will alert emergency services and contacts"
                     }
                   </p>
+
+                  {/* Personal Details Collapsible - Always visible in confirmation */}
+                  {(userName || bloodGroup || medicalConditions || allergies || emergencyContacts.length > 0) && (
+                    <div className="mt-2">
+                      <button
+                        onClick={() => setShowDetails(!showDetails)}
+                        className="w-full bg-muted/50 rounded-lg p-2.5 flex items-center justify-between hover:bg-muted transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Personal Details</span>
+                        </div>
+                        <motion.div
+                          animate={{ rotate: showDetails ? 180 : 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        </motion.div>
+                      </button>
+                      
+                      <AnimatePresence>
+                        {showDetails && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="bg-muted/30 rounded-b-lg p-3 space-y-2 text-left border-t border-border mt-0.5">
+                              {userName && (
+                                <div className="flex items-start gap-2">
+                                  <User className="h-3 w-3 shrink-0 mt-0.5 text-muted-foreground" />
+                                  <div>
+                                    <p className="text-[10px] text-muted-foreground">Name</p>
+                                    <p className="text-xs font-medium">{userName}</p>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {bloodGroup && (
+                                <div className="flex items-start gap-2">
+                                  <Heart className="h-3 w-3 shrink-0 mt-0.5 text-muted-foreground" />
+                                  <div>
+                                    <p className="text-[10px] text-muted-foreground">Blood Group</p>
+                                    <p className="text-xs font-medium">{bloodGroup}</p>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {medicalConditions && (
+                                <div className="flex items-start gap-2">
+                                  <Pill className="h-3 w-3 shrink-0 mt-0.5 text-muted-foreground" />
+                                  <div>
+                                    <p className="text-[10px] text-muted-foreground">Medical Conditions</p>
+                                    <p className="text-xs font-medium">{medicalConditions}</p>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {allergies && (
+                                <div className="flex items-start gap-2">
+                                  <AlertCircle className="h-3 w-3 shrink-0 mt-0.5 text-muted-foreground" />
+                                  <div>
+                                    <p className="text-[10px] text-muted-foreground">Allergies</p>
+                                    <p className="text-xs font-medium">{allergies}</p>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {emergencyContacts.length > 0 && (
+                                <div className="flex items-start gap-2">
+                                  <Phone className="h-3 w-3 shrink-0 mt-0.5 text-muted-foreground" />
+                                  <div>
+                                    <p className="text-[10px] text-muted-foreground">Emergency Contact</p>
+                                    <p className="text-xs font-medium">
+                                      {emergencyContacts[0].name} ({emergencyContacts[0].relationship})
+                                    </p>
+                                    <p className="text-[10px] text-muted-foreground">{emergencyContacts[0].phone}</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             </>

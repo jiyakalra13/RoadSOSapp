@@ -248,6 +248,9 @@ export default function RoadSOSApp() {
         emergencyContacts={profile?.emergencyContacts || []}
         isOnline={isOnline}
         userName={profile?.fullName}
+        bloodGroup={profile?.bloodGroup}
+        medicalConditions={profile?.medicalConditions}
+        allergies={profile?.allergies}
       />
 
       {/* Smart SOS Trigger Confirmation Overlay */}
@@ -259,6 +262,11 @@ export default function RoadSOSApp() {
         onCancel={handleCancelSmartTrigger}
         autoConfirmDelay={10}
         emergencyNumbers={{ ambulance: getEmergencyNumbers().ambulance }}
+        userName={profile?.fullName}
+        bloodGroup={profile?.bloodGroup}
+        medicalConditions={profile?.medicalConditions}
+        allergies={profile?.allergies}
+        emergencyContacts={profile?.emergencyContacts || []}
       />
 
       {/* PWA Install Prompt */}
