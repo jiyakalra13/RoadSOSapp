@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server"
 import fs from "fs"
 import path from "path"
+import twilio from "twilio"
 
-// For this mock implementation, we log the alert and store it in a local JSON file.
+// Initialize Twilio client
+// Requires TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in your .env or Render environment
+const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
+  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+  : null;
 
 export async function POST(request: Request) {
   try {
@@ -29,9 +34,32 @@ export async function POST(request: Request) {
     console.log(`Time: ${alertData.time}`)
     
     if (alertData.messageBody) {
-      console.log(`\n--- SIMULATED SMS SENT TO ${contacts?.length || 0} CONTACTS ---`)
-      console.log(alertData.messageBody)
-      console.log(`--------------------------------------------------\n`)
+      if (twilioClient && process.env.TWILIO_PHONE_NUMBER) {
+        console.log(`\n--- SENDING REAL SMS VIA TWILIO TO ${contacts?.length || 0} CONTACTS ---`)
+        
+        // Loop through all contacts and send the SMS
+        const sendPromises = contacts.map((contact: any) => {
+          return twilioClient.messages.create({
+            body: alertData.messageBody,
+            from: process.env.TWILIO_PHONE_NUMBER,
+            to: contact.phone // Ensure phone numbers are in E.164 format (e.g., +1234567890)
+          }).then(message => {
+            console.log(`Twilio Success: Message sent to ${contact.name} (SID: ${message.sid})`);
+          }).catch(error => {
+            console.error(`Twilio Error sending to ${contact.name}:`, error);
+          });
+        });
+        
+        // Wait for all messages to send (or fail)
+        await Promise.all(sendPromises);
+        console.log(`--------------------------------------------------\n`)
+      } else {
+        // Fallback simulation if Twilio is not configured
+        console.log(`\n--- SIMULATED SMS SENT TO ${contacts?.length || 0} CONTACTS ---`)
+        console.log(`[!] TWILIO KEYS NOT FOUND. Showing simulated message below:`)
+        console.log(alertData.messageBody)
+        console.log(`--------------------------------------------------\n`)
+      }
     }
     
     // Store in a local JSON file to satisfy the "Store" requirement
