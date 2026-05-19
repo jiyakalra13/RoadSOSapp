@@ -46,10 +46,8 @@ export async function POST(request: Request) {
                 "Content-Type": "application/json"
               },
               body: JSON.stringify({
-                route: "v3",
-                sender_id: "TXTIND",
+                route: "q",
                 message: alertData.messageBody,
-                language: "english",
                 flash: 0,
                 numbers: numbers
               })

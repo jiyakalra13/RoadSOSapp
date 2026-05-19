@@ -89,6 +89,39 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
         relationship: newContact.relationship
       }
       updateField("emergencyContacts", [...(formData.emergencyContacts || []), contact])
+      
+      // Fire off welcome SMS asynchronously
+      const notifyContact = async () => {
+        let lat, lng;
+        if (typeof window !== "undefined" && navigator.geolocation) {
+          try {
+            const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+            });
+            lat = pos.coords.latitude;
+            lng = pos.coords.longitude;
+          } catch (e) {
+            console.error("Geolocation error:", e);
+          }
+        }
+        
+        try {
+          await fetch('/api/sos/notify-contact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contactName: contact.name,
+              contactPhone: contact.phone,
+              userName: formData.fullName || "Someone",
+              location: (lat && lng) ? { lat, lng } : null
+            })
+          });
+        } catch (error) {
+          console.error("Failed to notify contact", error);
+        }
+      };
+      notifyContact();
+      
       setNewContact({ name: "", phone: "", relationship: "" })
     }
   }
