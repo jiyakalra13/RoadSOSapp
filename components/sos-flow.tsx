@@ -121,7 +121,13 @@ export function SOSFlow({
     }
     
     if (isActive && step === "active") {
-      startLiveUpdates(emergencyContacts, () => location ? { lat: location.lat, lng: location.lng, address } : null, userName, 10000)
+      startLiveUpdates(
+        emergencyContacts, 
+        () => location ? { lat: location.lat, lng: location.lng, address } : null, 
+        userName, 
+        { bloodGroup, conditions: medicalConditions, allergies },
+        10000
+      )
     } else {
       stopLiveUpdates()
     }
@@ -274,7 +280,8 @@ export function SOSFlow({
           emergencyContacts,
           locationToSend,
           isOnline,
-          userName
+          userName,
+          { bloodGroup, conditions: medicalConditions, allergies }
         )
         setSmsSent(true)
         if (locationToSend) {

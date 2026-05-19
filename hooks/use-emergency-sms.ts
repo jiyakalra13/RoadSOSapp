@@ -23,6 +23,12 @@ interface SMSStatus {
   error?: string
 }
 
+interface MedicalInfo {
+  bloodGroup?: string
+  conditions?: string
+  allergies?: string
+}
+
 // Store last known location for offline use
 const LAST_LOCATION_KEY = "roadsos_last_location"
 
@@ -55,21 +61,30 @@ export function getLastKnownLocation(): (LocationData & { savedAt: number }) | n
 function formatLocationMessage(
   location: LocationData | null,
   isLive: boolean,
-  userName?: string
+  userName?: string,
+  medicalInfo?: MedicalInfo
 ): string {
   const name = userName || "Someone"
   const mapsUrl = location
-    ? `https://www.google.com/maps?q=${location.lat},${location.lng}`
-    : null
+    ? `https://maps.google.com/?q=${location.lat},${location.lng}`
+    : "Location unavailable"
 
-  if (!location) {
-    return `EMERGENCY SOS from ${name}! They need help urgently. Location unavailable - please call them immediately!`
+  const now = new Date()
+  const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  
+  let medString = ""
+  if (medicalInfo && (medicalInfo.bloodGroup || medicalInfo.conditions || medicalInfo.allergies)) {
+    medString = `\n⚕️ Medical Info:\n`
+    if (medicalInfo.bloodGroup) medString += `- Blood: ${medicalInfo.bloodGroup}\n`
+    if (medicalInfo.conditions) medString += `- Conditions: ${medicalInfo.conditions}\n`
+    if (medicalInfo.allergies) medString += `- Allergies: ${medicalInfo.allergies}\n`
   }
 
-  const locationText = location.address || `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`
-  const liveIndicator = isLive ? "[LIVE]" : "[Last Known]"
-
-  return `EMERGENCY SOS! ${name} needs help! ${liveIndicator} Location: ${locationText}. Map: ${mapsUrl}. Please respond immediately or call emergency services!`
+  return `🚨 EMERGENCY ALERT!
+${name} may be in danger and triggered RoadSOS.
+📍 ${isLive ? "Live" : "Last Known"} Location: ${mapsUrl}
+🕒 Time: ${timeString}${medString}
+Please contact or reach immediately.`
 }
 
 function formatUpdateMessage(
@@ -77,10 +92,15 @@ function formatUpdateMessage(
   userName?: string
 ): string {
   const name = userName || "User"
-  const mapsUrl = `https://www.google.com/maps?q=${location.lat},${location.lng}`
-  const locationText = location.address || `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`
+  const mapsUrl = `https://maps.google.com/?q=${location.lat},${location.lng}`
+  
+  const now = new Date()
+  const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
-  return `[SOS UPDATE] ${name}'s current location: ${locationText}. Map: ${mapsUrl}`
+  return `🚨 [SOS UPDATE]
+${name} is still in emergency.
+📍 Current Location: ${mapsUrl}
+🕒 Time: ${timeString}`
 }
 
 // Generate SMS URL for mobile devices
@@ -109,6 +129,7 @@ async function sendSmsToContacts(
   location: LocationData | null,
   isLive: boolean,
   userName?: string,
+  message?: string,
   onStatusUpdate?: (status: SMSStatus) => void
 ): Promise<SMSStatus[]> {
   const results: SMSStatus[] = []
@@ -131,7 +152,8 @@ async function sendSmsToContacts(
       location: location,
       time: new Date().toISOString(),
       contacts: contacts,
-      status: 'active'
+      status: 'active',
+      messageBody: message || ""
     }
 
     const response = await fetch('/api/sos/send-alert', {
@@ -193,7 +215,8 @@ export function useEmergencySMS() {
       contacts: EmergencyContact[],
       currentLocation: LocationData | null,
       isOnline: boolean,
-      userName?: string
+      userName?: string,
+      medicalInfo?: MedicalInfo
     ) => {
       if (contacts.length === 0 || sentInitialSmsRef.current) return
 
@@ -218,9 +241,9 @@ export function useEmergencySMS() {
         saveLastKnownLocation(currentLocation)
       }
 
-      const message = formatLocationMessage(locationToSend, isLive, userName)
+      const message = formatLocationMessage(locationToSend, isLive, userName, medicalInfo)
       
-      await sendSmsToContacts(contacts, locationToSend, isLive, userName, handleStatusUpdate)
+      await sendSmsToContacts(contacts, locationToSend, isLive, userName, message, handleStatusUpdate)
       
       setIsSending(false)
     },
@@ -241,7 +264,7 @@ export function useEmergencySMS() {
 
       const message = formatUpdateMessage(location, userName)
       
-      await sendSmsToContacts(contacts, location, true, userName)
+      await sendSmsToContacts(contacts, location, true, userName, message)
       
       return message
     },
@@ -254,26 +277,22 @@ export function useEmergencySMS() {
       contacts: EmergencyContact[],
       getLocation: () => LocationData | null,
       userName?: string,
-      intervalMs: number = 60000 // Default 1 minute
+      medicalInfo?: MedicalInfo,
+      intervalMs: number = 30000 // default to 30 seconds
     ) => {
       // Clear any existing interval
-      if (locationUpdateIntervalRef.current) {
-        clearInterval(locationUpdateIntervalRef.current)
-      }
+      stopLiveUpdates()
 
-      locationUpdateIntervalRef.current = setInterval(() => {
+      locationUpdateIntervalRef.current = setInterval(async () => {
         const location = getLocation()
         if (location) {
-          saveLastKnownLocation(location)
-          // Automatically send updates to emergency contacts every interval
-          sendSmsToContacts(contacts, location, true, userName)
+          await sendLocationUpdate(contacts, location, userName, medicalInfo)
         }
       }, intervalMs)
     },
-    []
+    [sendLocationUpdate]
   )
 
-  // Stop live updates
   const stopLiveUpdates = useCallback(() => {
     if (locationUpdateIntervalRef.current) {
       clearInterval(locationUpdateIntervalRef.current)
@@ -289,24 +308,25 @@ export function useEmergencySMS() {
     stopLiveUpdates()
   }, [stopLiveUpdates])
 
-  // Generate a shareable message for manual sending
-  const getShareableMessage = useCallback(
-    (location: LocationData | null, isOnline: boolean, userName?: string) => {
-      let locationToUse = location
-      let isLive = isOnline && !!location
+  const getShareableMessage = useCallback((
+    currentLocation: LocationData | null,
+    isOnline: boolean,
+    userName?: string,
+    medicalInfo?: MedicalInfo
+  ) => {
+    let locationToSend = currentLocation
+    let isLive = isOnline && !!currentLocation
 
-      if (!location || !isOnline) {
-        const lastLocation = getLastKnownLocation()
-        if (lastLocation) {
-          locationToUse = lastLocation
-          isLive = false
-        }
+    if (!currentLocation || !isOnline) {
+      const lastLocation = getLastKnownLocation()
+      if (lastLocation) {
+        locationToSend = lastLocation
+        isLive = false
       }
+    }
 
-      return formatLocationMessage(locationToUse, isLive, userName)
-    },
-    []
-  )
+    return formatLocationMessage(locationToSend, isLive, userName, medicalInfo)
+  }, [])
 
   // Bulk send to all contacts (uses backend API)
   const sendToAllContacts = useCallback(
@@ -314,7 +334,8 @@ export function useEmergencySMS() {
       contacts: EmergencyContact[],
       location: LocationData | null,
       isOnline: boolean,
-      userName?: string
+      userName?: string,
+      medicalInfo?: MedicalInfo
     ) => {
       let locationToUse = location
       let isLive = isOnline && !!location
@@ -327,7 +348,9 @@ export function useEmergencySMS() {
         }
       }
 
-      await sendSmsToContacts(contacts, locationToUse, isLive, userName, handleStatusUpdate)
+      const message = formatLocationMessage(locationToUse, isLive, userName, medicalInfo)
+
+      await sendSmsToContacts(contacts, locationToUse, isLive, userName, message, handleStatusUpdate)
       return true
     },
     [handleStatusUpdate]

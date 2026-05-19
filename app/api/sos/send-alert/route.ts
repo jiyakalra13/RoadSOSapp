@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   try {
     const payload = await request.json()
     
-    const { userId, triggerType, location, time, contacts, status } = payload
+    const { userId, triggerType, location, time, contacts, status, messageBody } = payload
     
     const alertData = {
       id: `sos-${Date.now()}`,
@@ -18,15 +18,21 @@ export async function POST(request: Request) {
       time,
       contacts,
       status,
+      messageBody,
       createdAt: new Date().toISOString()
     }
     
-    // Log the incoming SOS alert to the console
     console.log(`[SOS ALERT RECEIVED]`)
     console.log(`User ID: ${alertData.userId}`)
     console.log(`Trigger: ${alertData.triggerType}`)
     console.log(`Status: ${alertData.status}`)
     console.log(`Time: ${alertData.time}`)
+    
+    if (alertData.messageBody) {
+      console.log(`\n--- SIMULATED SMS SENT TO ${contacts?.length || 0} CONTACTS ---`)
+      console.log(alertData.messageBody)
+      console.log(`--------------------------------------------------\n`)
+    }
     
     // Store in a local JSON file to satisfy the "Store" requirement
     const dataDir = path.join(process.cwd(), 'data')
