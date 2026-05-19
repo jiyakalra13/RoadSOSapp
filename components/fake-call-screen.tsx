@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Phone, PhoneOff, User } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 interface FakeCallScreenProps {
   callerName: string
