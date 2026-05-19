@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { AlertTriangle, X, Mic, Car, Ambulance, Phone, User, Heart, Pill, AlertCircle, ChevronDown } from "lucide-react"
+import { AlertTriangle, X, Mic, Car, Phone, User, Heart, Pill, AlertCircle, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useSOSEffects } from "@/hooks/use-sos-effects"
 
@@ -308,9 +308,9 @@ export function SOSConfirmationOverlay({
                   {(triggerType === "volume" || triggerType === "voice") ? (
                     <>
                       <div className="flex items-center justify-center gap-2 text-emergency">
-                        <Ambulance className="h-4 w-4" />
+                        <AlertTriangle className="h-4 w-4" />
                         <p className="text-sm font-medium">
-                          Auto-activating SOS
+                          SOS will activate automatically
                         </p>
                       </div>
                       <p className="text-xs text-muted-foreground text-center">
@@ -340,19 +340,14 @@ export function SOSConfirmationOverlay({
                     <Button
                       variant="outline"
                       onClick={handleCancel}
-                      className="flex-1 h-12 text-base font-semibold border-2"
+                      className={`h-12 text-base font-semibold border-2 ${
+                        (triggerType === "volume" || triggerType === "voice") ? "w-full" : "flex-1"
+                      }`}
                     >
                       Cancel
                     </Button>
-                    {(triggerType === "volume" || triggerType === "voice") ? (
-                      <Button
-                        onClick={handleConfirm}
-                        className="flex-1 h-12 bg-emergency hover:bg-emergency/90 text-white text-base font-semibold"
-                      >
-                        <Ambulance className="h-5 w-5 mr-2" />
-                        Activate Now
-                      </Button>
-                    ) : (
+                    {/* Only show Activate button for non-volume/voice triggers */}
+                    {triggerType !== "volume" && triggerType !== "voice" && (
                       <Button
                         onClick={handleConfirm}
                         className="flex-1 h-12 bg-emergency hover:bg-emergency/90 text-white text-base font-semibold"
