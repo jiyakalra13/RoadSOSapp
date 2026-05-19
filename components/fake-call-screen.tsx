@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Phone, PhoneOff, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -16,7 +16,6 @@ type CallState = "waiting" | "ringing" | "answered"
 export function FakeCallScreen({ callerName, delaySeconds, onEndCall }: FakeCallScreenProps) {
   const [callState, setCallState] = useState<CallState>("waiting")
   const [callDuration, setCallDuration] = useState(0)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   // Initialize audio and handle waiting countdown
   useEffect(() => {
