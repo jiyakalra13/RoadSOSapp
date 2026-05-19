@@ -317,36 +317,69 @@ export function useSmartSOSTriggers({
   }, [settings.voiceCommandEnabled, enabled, checkForSOSCommand, requestMicrophonePermission])
 
   // Volume button detection (3 quick presses)
+  // Since PWAs cannot natively detect hardware keys, we use a silent audio hack for Android.
   useEffect(() => {
     if (!settings.volumeButtonEnabled || !enabled) return
+    if (typeof window === "undefined") return
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Check for volume up or volume down keys
-      if (event.key === "AudioVolumeUp" || event.key === "AudioVolumeDown" || 
-          event.key === "VolumeUp" || event.key === "VolumeDown") {
-        const now = Date.now()
-        volumePressTimesRef.current.push(now)
+    // 1-second silent WAV audio data URI
+    const silentAudioSrc = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA"
+    
+    const audio = new Audio(silentAudioSrc)
+    audio.loop = true
+    audio.playsInline = true
+    // Set to 0.5 so we can detect volume changes in both directions
+    audio.volume = 0.5 
+
+    // We must wait for first user interaction to play the audio
+    const startAudio = () => {
+      audio.play().catch(() => {
+        // Browser might still block it, silently fail
+      })
+      // Remove listeners after first interaction
+      document.removeEventListener("touchstart", startAudio)
+      document.removeEventListener("click", startAudio)
+    }
+
+    document.addEventListener("touchstart", startAudio)
+    document.addEventListener("click", startAudio)
+
+    const handleVolumeChange = () => {
+      // Reset volume to 0.5 so we can keep detecting changes in the same direction
+      // Don't reset if it's already 0.5 to prevent infinite loops
+      if (audio.volume !== 0.5) {
+        audio.volume = 0.5
+      }
+
+      const now = Date.now()
+      volumePressTimesRef.current.push(now)
+      
+      // Keep only presses within the last 2 seconds
+      volumePressTimesRef.current = volumePressTimesRef.current.filter(
+        time => now - time < 2000
+      )
+      
+      // Check for 3 quick presses (within 1.5 seconds)
+      if (volumePressTimesRef.current.length >= 3) {
+        const timeDiff = volumePressTimesRef.current[volumePressTimesRef.current.length - 1] - 
+                        volumePressTimesRef.current[volumePressTimesRef.current.length - 3]
         
-        // Keep only presses within the last 2 seconds
-        volumePressTimesRef.current = volumePressTimesRef.current.filter(
-          time => now - time < 2000
-        )
-        
-        // Check for 3 quick presses (within 1.5 seconds)
-        if (volumePressTimesRef.current.length >= 3) {
-          const timeDiff = volumePressTimesRef.current[volumePressTimesRef.current.length - 1] - 
-                          volumePressTimesRef.current[volumePressTimesRef.current.length - 3]
-          
-          if (timeDiff < 1500) {
-            volumePressTimesRef.current = []
-            onTriggerRef.current("volume")
-          }
+        if (timeDiff < 1500) {
+          volumePressTimesRef.current = []
+          onTriggerRef.current("volume")
         }
       }
     }
 
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
+    audio.addEventListener("volumechange", handleVolumeChange)
+
+    return () => {
+      document.removeEventListener("touchstart", startAudio)
+      document.removeEventListener("click", startAudio)
+      audio.removeEventListener("volumechange", handleVolumeChange)
+      audio.pause()
+      audio.src = ""
+    }
   }, [settings.volumeButtonEnabled, enabled])
 
   // Crash & Shake detection via accelerometer
