@@ -254,6 +254,7 @@ export default function RoadSOSApp() {
         onConfirm={handleConfirmSmartTrigger}
         onCancel={handleCancelSmartTrigger}
         autoConfirmDelay={10}
+        emergencyNumbers={{ ambulance: getEmergencyNumbers().ambulance }}
       />
 
       {/* PWA Install Prompt */}
