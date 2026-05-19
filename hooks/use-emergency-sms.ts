@@ -356,7 +356,13 @@ export function useEmergencySMS() {
 
       const message = formatLocationMessage(locationToUse, isLive, userName, medicalInfo)
 
-      await sendSmsToContacts(contacts, locationToUse, isLive, userName, message, handleStatusUpdate)
+      if (!isOnline) {
+        // Trigger offline fallback
+        const phoneNumbers = contacts.map(c => c.phone)
+        openSmsApp(phoneNumbers, message)
+      } else {
+        await sendSmsToContacts(contacts, locationToUse, isLive, userName, message, handleStatusUpdate)
+      }
       return true
     },
     [handleStatusUpdate]
