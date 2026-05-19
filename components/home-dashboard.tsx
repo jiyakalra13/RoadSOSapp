@@ -32,6 +32,8 @@ interface HomeDashboardProps {
   accuracy?: number
   isVoiceListening?: boolean
   voiceEnabled?: boolean
+  micPermission?: "prompt" | "granted" | "denied"
+  onRequestMicPermission?: () => void
 }
 
 const services = [
@@ -81,7 +83,9 @@ export function HomeDashboard({
   address,
   accuracy,
   isVoiceListening,
-  voiceEnabled
+  voiceEnabled,
+  micPermission,
+  onRequestMicPermission
 }: HomeDashboardProps) {
   const [sosPressed, setSosPressed] = useState(false)
   const [pressTimer, setPressTimer] = useState<NodeJS.Timeout | null>(null)
@@ -416,24 +420,50 @@ export function HomeDashboard({
 
       {/* Voice Listening Indicator */}
       {voiceEnabled && (
-        <Card className="flex items-center justify-center gap-2 p-2 mt-3 bg-primary/5 border-primary/20 shrink-0">
+        <Card 
+          className={cn(
+            "flex items-center justify-center gap-2 p-2 mt-3 shrink-0 cursor-pointer",
+            micPermission === "denied" 
+              ? "bg-destructive/5 border-destructive/20" 
+              : "bg-primary/5 border-primary/20"
+          )}
+          onClick={micPermission !== "granted" ? onRequestMicPermission : undefined}
+        >
           <motion.div
             animate={isVoiceListening ? { scale: [1, 1.2, 1], opacity: [1, 0.7, 1] } : {}}
             transition={{ duration: 1.5, repeat: Infinity }}
             className={cn(
               "h-2 w-2 rounded-full",
-              isVoiceListening ? "bg-primary" : "bg-muted-foreground"
+              micPermission === "denied" 
+                ? "bg-destructive" 
+                : isVoiceListening 
+                  ? "bg-primary" 
+                  : "bg-muted-foreground"
             )}
           />
           <Mic className={cn(
             "h-3.5 w-3.5",
-            isVoiceListening ? "text-primary" : "text-muted-foreground"
+            micPermission === "denied" 
+              ? "text-destructive" 
+              : isVoiceListening 
+                ? "text-primary" 
+                : "text-muted-foreground"
           )} />
           <span className={cn(
             "text-[10px] font-medium",
-            isVoiceListening ? "text-primary" : "text-muted-foreground"
+            micPermission === "denied" 
+              ? "text-destructive" 
+              : isVoiceListening 
+                ? "text-primary" 
+                : "text-muted-foreground"
           )}>
-            {isVoiceListening ? "Listening for \"Help me\", \"Call ambulance\"..." : "Voice detection starting..."}
+            {micPermission === "denied" 
+              ? "Tap to enable microphone for voice commands" 
+              : micPermission === "prompt"
+                ? "Tap to enable voice commands"
+                : isVoiceListening 
+                  ? "Listening for \"Help me\", \"Call ambulance\"..." 
+                  : "Voice detection starting..."}
           </span>
         </Card>
       )}
