@@ -78,7 +78,7 @@ export function useUserProfile() {
     setIsLoading(false)
   }, [])
 
-  // Save profile to localStorage
+  // Save profile to localStorage and Backend
   const saveProfile = useCallback((newProfile: Partial<UserProfile>) => {
     const now = new Date().toISOString()
     const updated: UserProfile = {
@@ -89,9 +89,17 @@ export function useUserProfile() {
       createdAt: profile?.createdAt || now
     }
     
+    // Save to localStorage
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
     setProfile(updated)
     setCountry(getCountryByCode(updated.countryCode))
+    
+    // Save to Backend (fire and forget)
+    fetch('/api/user/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated)
+    }).catch(err => console.error('Failed to save profile to backend:', err))
     
     return updated
   }, [profile])

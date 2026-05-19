@@ -99,15 +99,16 @@ export function SOSFlow({
   
   const { 
     smsStatuses, 
-    isSending: isSendingSms, 
     sendToAllContacts, 
     getShareableMessage,
-    reset: resetSms 
+    reset: resetSms,
+    startLiveUpdates,
+    stopLiveUpdates
   } = useEmergencySMS()
   
   const hasSentInitialSmsRef = useRef(false)
 
-  // Start/stop effects based on SOS state
+  // Start/stop effects and live updates based on SOS state
   useEffect(() => {
     if (isActive && (step === "countdown" || step === "sending" || step === "active")) {
       startEffects()
@@ -115,10 +116,17 @@ export function SOSFlow({
       stopEffects()
     }
     
+    if (isActive && step === "active") {
+      startLiveUpdates(emergencyContacts, () => location ? { lat: location.lat, lng: location.lng, address } : null, userName, 10000)
+    } else {
+      stopLiveUpdates()
+    }
+    
     return () => {
       stopEffects()
+      stopLiveUpdates()
     }
-  }, [isActive, step, startEffects, stopEffects])
+  }, [isActive, step, startEffects, stopEffects, startLiveUpdates, stopLiveUpdates, emergencyContacts, location, address, userName])
 
   // Wake Lock - Keep screen on during SOS until user selects "Safe"
   useEffect(() => {
@@ -389,7 +397,7 @@ export function SOSFlow({
                 transition={{ duration: 0.6, repeat: Infinity }}
                 className="text-xl font-bold mb-1"
               >
-                Sending Alert...
+                Sending alerts...
               </motion.h2>
               <p className="text-sm opacity-80 mb-6">Press cancel to stop</p>
               
@@ -420,7 +428,7 @@ export function SOSFlow({
                 <Loader2 className="h-8 w-8 animate-spin" />
               </motion.div>
               
-              <h2 className="text-xl font-bold mb-4">Sending Alert</h2>
+              <h2 className="text-xl font-bold mb-4">Sending alerts...</h2>
               
               <div className="w-full space-y-2">
                 <StatusItem
@@ -430,12 +438,12 @@ export function SOSFlow({
                 />
                 <StatusItem
                   icon={Share2}
-                  label="Sharing location"
+                  label="Sharing live location..."
                   status={stepStatus.sharing}
                 />
                 <StatusItem
                   icon={Bell}
-                  label="Alerting services"
+                  label="Emergency contacts notified"
                   status={stepStatus.alerting}
                 />
               </div>

@@ -9,12 +9,14 @@ export interface SmartTriggerSettings {
   voiceCommandEnabled: boolean
   volumeButtonEnabled: boolean
   crashDetectionEnabled: boolean
+  shakeDetectionEnabled: boolean
 }
 
 const defaultSettings: SmartTriggerSettings = {
   voiceCommandEnabled: true, // Enabled by default for hands-free SOS
   volumeButtonEnabled: true,
-  crashDetectionEnabled: true
+  crashDetectionEnabled: true,
+  shakeDetectionEnabled: true
 }
 
 // Voice command phrases that trigger SOS
@@ -35,7 +37,7 @@ const SOS_VOICE_COMMANDS = [
 ]
 
 interface UseSmartSOSTriggersOptions {
-  onTrigger: (triggerType: "voice" | "volume" | "crash") => void
+  onTrigger: (triggerType: "voice" | "volume" | "crash" | "shake", command?: string) => void
   enabled?: boolean
 }
 
@@ -50,6 +52,7 @@ interface SmartSOSTriggersResult {
     voice: boolean
     volume: boolean
     crash: boolean
+    shake: boolean
   }
   micPermission: "prompt" | "granted" | "denied"
   requestMicrophonePermission: () => Promise<boolean>
@@ -105,7 +108,8 @@ export function useSmartSOSTriggers({
   const [isSupported, setIsSupported] = useState({
     voice: false,
     volume: true, // Volume detection via keydown is widely supported
-    crash: false
+    crash: false,
+    shake: false
   })
 
   const recognitionRef = useRef<SpeechRecognition | null>(null)
@@ -145,7 +149,8 @@ export function useSmartSOSTriggers({
     setIsSupported({
       voice: !!SpeechRecognitionAPI,
       volume: true,
-      crash: "DeviceMotionEvent" in window
+      crash: "DeviceMotionEvent" in window,
+      shake: "DeviceMotionEvent" in window
     })
 
     // Check and request microphone permission
@@ -227,7 +232,7 @@ export function useSmartSOSTriggers({
           console.log("[v0] SOS COMMAND DETECTED:", transcript)
           setLastDetectedCommand(transcript)
           shouldListenRef.current = false
-          onTriggerRef.current("voice")
+          onTriggerRef.current("voice", transcript)
           recognition.stop()
           return
         }
@@ -344,13 +349,20 @@ export function useSmartSOSTriggers({
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [settings.volumeButtonEnabled, enabled])
 
-  // Crash detection via accelerometer
+  // Crash & Shake detection via accelerometer
   useEffect(() => {
-    if (!settings.crashDetectionEnabled || !enabled) return
+    if ((!settings.crashDetectionEnabled && !settings.shakeDetectionEnabled) || !enabled) return
     if (typeof window === "undefined" || !("DeviceMotionEvent" in window)) return
 
     let lastAcceleration = { x: 0, y: 0, z: 0 }
+    let lastTime = Date.now()
+    let shakeCount = 0
+    let lastShakeTime = 0
+    
     const CRASH_THRESHOLD = 30 // G-force threshold for crash detection
+    const SHAKE_THRESHOLD = 15 // G-force threshold for shake
+    const SHAKE_TIMEOUT = 1000 // Reset shake count after 1s
+    const REQUIRED_SHAKES = 4 // Number of shakes required
 
     const handleMotion = (event: DeviceMotionEvent) => {
       const acceleration = event.accelerationIncludingGravity
@@ -361,9 +373,25 @@ export function useSmartSOSTriggers({
       const deltaZ = Math.abs((acceleration.z || 0) - lastAcceleration.z)
       
       const totalDelta = Math.sqrt(deltaX ** 2 + deltaY ** 2 + deltaZ ** 2)
+      const now = Date.now()
 
-      if (totalDelta > CRASH_THRESHOLD) {
+      if (settings.crashDetectionEnabled && totalDelta > CRASH_THRESHOLD) {
         onTriggerRef.current("crash")
+      }
+
+      if (settings.shakeDetectionEnabled && totalDelta > SHAKE_THRESHOLD) {
+        if (now - lastTime > 100) { // Debounce
+          if (now - lastShakeTime > SHAKE_TIMEOUT) {
+            shakeCount = 0 // reset if too much time passed
+          }
+          shakeCount++
+          lastShakeTime = now
+          
+          if (shakeCount >= REQUIRED_SHAKES) {
+            shakeCount = 0
+            onTriggerRef.current("shake")
+          }
+        }
       }
 
       lastAcceleration = {
@@ -371,11 +399,12 @@ export function useSmartSOSTriggers({
         y: acceleration.y || 0,
         z: acceleration.z || 0
       }
+      lastTime = now
     }
 
     window.addEventListener("devicemotion", handleMotion)
     return () => window.removeEventListener("devicemotion", handleMotion)
-  }, [settings.crashDetectionEnabled, enabled])
+  }, [settings.crashDetectionEnabled, settings.shakeDetectionEnabled, enabled])
 
   const startVoiceListening = useCallback(() => {
     if (!recognitionRef.current || isVoiceListening) return

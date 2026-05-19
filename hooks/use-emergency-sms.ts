@@ -103,45 +103,66 @@ function openSmsApp(phone: string, message: string): void {
   window.location.href = url
 }
 
-// Send SMS to multiple contacts (opens SMS app for each)
+// Send SMS to multiple contacts via backend API
 async function sendSmsToContacts(
   contacts: EmergencyContact[],
-  message: string,
+  location: LocationData | null,
+  isLive: boolean,
+  userName?: string,
   onStatusUpdate?: (status: SMSStatus) => void
 ): Promise<SMSStatus[]> {
   const results: SMSStatus[] = []
-
+  
+  // Set initial status
   for (const contact of contacts) {
-    onStatusUpdate?.({
+    const status: SMSStatus = {
       contactId: contact.id,
       contactName: contact.name,
       status: "sending",
+    }
+    results.push(status)
+    onStatusUpdate?.(status)
+  }
+
+  try {
+    const payload = {
+      userId: userName || 'Anonymous',
+      triggerType: 'sos',
+      location: location,
+      time: new Date().toISOString(),
+      contacts: contacts,
+      status: 'active'
+    }
+
+    const response = await fetch('/api/sos/send-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     })
 
-    try {
-      // For web, we can only open the SMS app with pre-filled message
-      // The actual sending is done by the user
-      openSmsApp(contact.phone, message)
-      
-      // Small delay between opening SMS apps
-      await new Promise((resolve) => setTimeout(resolve, 500))
+    if (!response.ok) throw new Error('Failed to send alerts')
 
+    for (const contact of contacts) {
       const status: SMSStatus = {
         contactId: contact.id,
         contactName: contact.name,
         status: "sent",
       }
-      results.push(status)
       onStatusUpdate?.(status)
-    } catch (error) {
+      const index = results.findIndex(s => s.contactId === contact.id)
+      if (index >= 0) results[index] = status
+    }
+  } catch (error) {
+    for (const contact of contacts) {
       const status: SMSStatus = {
         contactId: contact.id,
         contactName: contact.name,
         status: "failed",
-        error: error instanceof Error ? error.message : "Failed to open SMS",
+        error: error instanceof Error ? error.message : "Failed to send SMS",
       }
-      results.push(status)
       onStatusUpdate?.(status)
+      const index = results.findIndex(s => s.contactId === contact.id)
+      if (index >= 0) results[index] = status
     }
   }
 
@@ -199,7 +220,7 @@ export function useEmergencySMS() {
 
       const message = formatLocationMessage(locationToSend, isLive, userName)
       
-      await sendSmsToContacts(contacts, message, handleStatusUpdate)
+      await sendSmsToContacts(contacts, locationToSend, isLive, userName, handleStatusUpdate)
       
       setIsSending(false)
     },
@@ -220,9 +241,8 @@ export function useEmergencySMS() {
 
       const message = formatUpdateMessage(location, userName)
       
-      // For updates, we'll just prepare the message but not auto-open SMS
-      // This prevents spamming the user with SMS app opens
-      // Instead, we can show a "Send Update" button
+      await sendSmsToContacts(contacts, location, true, userName)
+      
       return message
     },
     []
@@ -245,7 +265,8 @@ export function useEmergencySMS() {
         const location = getLocation()
         if (location) {
           saveLastKnownLocation(location)
-          // Location is being saved, updates can be sent manually
+          // Automatically send updates to emergency contacts every interval
+          sendSmsToContacts(contacts, location, true, userName)
         }
       }, intervalMs)
     },
@@ -287,7 +308,7 @@ export function useEmergencySMS() {
     []
   )
 
-  // Bulk send to all contacts (opens native share or sequential SMS)
+  // Bulk send to all contacts (uses backend API)
   const sendToAllContacts = useCallback(
     async (
       contacts: EmergencyContact[],
@@ -295,30 +316,21 @@ export function useEmergencySMS() {
       isOnline: boolean,
       userName?: string
     ) => {
-      const message = getShareableMessage(location, isOnline, userName)
+      let locationToUse = location
+      let isLive = isOnline && !!location
 
-      // Try native share first (better UX on mobile)
-      if (navigator.share) {
-        try {
-          await navigator.share({
-            title: "EMERGENCY SOS",
-            text: message,
-          })
-          return true
-        } catch {
-          // User cancelled or share failed, fall back to SMS
+      if (!location || !isOnline) {
+        const lastLocation = getLastKnownLocation()
+        if (lastLocation) {
+          locationToUse = lastLocation
+          isLive = false
         }
       }
 
-      // Fall back to SMS - open for first contact
-      if (contacts.length > 0) {
-        openSmsApp(contacts[0].phone, message)
-        return true
-      }
-
-      return false
+      await sendSmsToContacts(contacts, locationToUse, isLive, userName, handleStatusUpdate)
+      return true
     },
-    [getShareableMessage]
+    [handleStatusUpdate]
   )
 
   return {
