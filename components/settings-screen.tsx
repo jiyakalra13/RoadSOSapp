@@ -41,7 +41,7 @@ const defaultGeneralSettings: GeneralSettings = {
 
 export function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [smartTriggers, setSmartTriggers] = useState<SmartTriggerSettings>({
-    voiceCommandEnabled: false,
+    voiceCommandEnabled: true, // Enabled by default for hands-free SOS
     volumeButtonEnabled: true,
     crashDetectionEnabled: true
   })
@@ -104,7 +104,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
           </p>
           <FeatureToggle
             label="Voice Commands"
-            description={`"Help me", "Call ambulance"`}
+            description="Always listening for help"
             icon={<Mic className="h-3.5 w-3.5 text-muted-foreground" />}
             enabled={smartTriggers.voiceCommandEnabled}
             onChange={(value) => handleSmartTriggerChange("voiceCommandEnabled", value)}
@@ -124,7 +124,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
             onChange={(value) => handleSmartTriggerChange("crashDetectionEnabled", value)}
           />
           <p className="text-[10px] text-muted-foreground pt-1 border-t border-border">
-            Smart triggers show a confirmation before activating SOS
+            Voice commands: &quot;Help me&quot;, &quot;Call ambulance&quot;, &quot;Emergency&quot;, &quot;SOS&quot;
           </p>
         </Card>
 

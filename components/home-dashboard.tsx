@@ -11,7 +11,8 @@ import {
   AlertTriangle,
   Loader2,
   RefreshCw,
-  Building2
+  Building2,
+  Mic
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Card } from "@/components/ui/card"
@@ -29,6 +30,10 @@ interface HomeDashboardProps {
   requestLocation?: () => void
   address?: string
   accuracy?: number
+  isVoiceListening?: boolean
+  voiceEnabled?: boolean
+  micPermission?: "prompt" | "granted" | "denied"
+  onRequestMicPermission?: () => void
 }
 
 const services = [
@@ -76,7 +81,11 @@ export function HomeDashboard({
   permissionStatus,
   requestLocation,
   address,
-  accuracy
+  accuracy,
+  isVoiceListening,
+  voiceEnabled,
+  micPermission,
+  onRequestMicPermission
 }: HomeDashboardProps) {
   const [sosPressed, setSosPressed] = useState(false)
   const [pressTimer, setPressTimer] = useState<NodeJS.Timeout | null>(null)
@@ -409,14 +418,71 @@ export function HomeDashboard({
         })}
       </div>
 
+      {/* Voice Listening Indicator */}
+      {voiceEnabled && (
+        <Card 
+          className={cn(
+            "flex items-center justify-center gap-2 p-2 mt-3 shrink-0 cursor-pointer",
+            micPermission === "denied" 
+              ? "bg-destructive/5 border-destructive/20" 
+              : "bg-primary/5 border-primary/20"
+          )}
+          onClick={micPermission !== "granted" ? onRequestMicPermission : undefined}
+        >
+          <motion.div
+            animate={isVoiceListening ? { scale: [1, 1.2, 1], opacity: [1, 0.7, 1] } : {}}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className={cn(
+              "h-2 w-2 rounded-full",
+              micPermission === "denied" 
+                ? "bg-destructive" 
+                : isVoiceListening 
+                  ? "bg-primary" 
+                  : "bg-muted-foreground"
+            )}
+          />
+          <Mic className={cn(
+            "h-3.5 w-3.5",
+            micPermission === "denied" 
+              ? "text-destructive" 
+              : isVoiceListening 
+                ? "text-primary" 
+                : "text-muted-foreground"
+          )} />
+          <span className={cn(
+            "text-[10px] font-medium",
+            micPermission === "denied" 
+              ? "text-destructive" 
+              : isVoiceListening 
+                ? "text-primary" 
+                : "text-muted-foreground"
+          )}>
+            {micPermission === "denied" 
+              ? "Tap to enable microphone for voice commands" 
+              : micPermission === "prompt"
+                ? "Tap to enable voice commands"
+                : isVoiceListening 
+                  ? "Listening for \"Help me\", \"Call ambulance\"..." 
+                  : "Voice detection starting..."}
+          </span>
+        </Card>
+      )}
+
       {/* Feature indicators */}
-      <div className="flex items-center justify-center gap-3 mt-3 text-[10px] text-muted-foreground shrink-0">
+      <div className="flex items-center justify-center gap-3 mt-2 text-[10px] text-muted-foreground shrink-0">
         <div className="flex items-center gap-1">
           <div className="h-1.5 w-1.5 rounded-full bg-success" />
           Motion
         </div>
         <div className="flex items-center gap-1">
-          <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+          <motion.div 
+            animate={isVoiceListening ? { scale: [1, 1.3, 1] } : {}}
+            transition={{ duration: 1, repeat: Infinity }}
+            className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              isVoiceListening ? "bg-primary" : "bg-muted-foreground"
+            )}
+          />
           Voice
         </div>
         <div className="flex items-center gap-1">

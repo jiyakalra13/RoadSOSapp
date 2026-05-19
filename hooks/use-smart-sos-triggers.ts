@@ -12,7 +12,7 @@ export interface SmartTriggerSettings {
 }
 
 const defaultSettings: SmartTriggerSettings = {
-  voiceCommandEnabled: false,
+  voiceCommandEnabled: true, // Enabled by default for hands-free SOS
   volumeButtonEnabled: true,
   crashDetectionEnabled: true
 }
@@ -26,7 +26,12 @@ const SOS_VOICE_COMMANDS = [
   "call ambulance",
   "emergency",
   "call police",
-  "i need help"
+  "i need help",
+  "sos",
+  "save me",
+  "accident",
+  "crash",
+  "call for help"
 ]
 
 interface UseSmartSOSTriggersOptions {
@@ -46,6 +51,8 @@ interface SmartSOSTriggersResult {
     volume: boolean
     crash: boolean
   }
+  micPermission: "prompt" | "granted" | "denied"
+  requestMicrophonePermission: () => Promise<boolean>
 }
 
 // Type definitions for Web Speech API
@@ -94,6 +101,7 @@ export function useSmartSOSTriggers({
   const [settings, setSettings] = useState<SmartTriggerSettings>(defaultSettings)
   const [isVoiceListening, setIsVoiceListening] = useState(false)
   const [lastDetectedCommand, setLastDetectedCommand] = useState<string | null>(null)
+  const [micPermission, setMicPermission] = useState<"prompt" | "granted" | "denied">("prompt")
   const [isSupported, setIsSupported] = useState({
     voice: false,
     volume: true, // Volume detection via keydown is widely supported
@@ -103,6 +111,11 @@ export function useSmartSOSTriggers({
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const volumePressTimesRef = useRef<number[]>([])
   const onTriggerRef = useRef(onTrigger)
+
+  // Track if voice recognition should be running
+  const shouldListenRef = useRef(false)
+  const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const hasRequestedMicRef = useRef(false)
 
   // Keep trigger ref updated
   useEffect(() => {
@@ -121,7 +134,7 @@ export function useSmartSOSTriggers({
     }
   }, [])
 
-  // Check for API support
+  // Check for API support and request microphone permission
   useEffect(() => {
     if (typeof window === "undefined") return
 
@@ -132,6 +145,18 @@ export function useSmartSOSTriggers({
       volume: true,
       crash: "DeviceMotionEvent" in window
     })
+
+    // Check and request microphone permission
+    if (navigator.permissions) {
+      navigator.permissions.query({ name: "microphone" as PermissionName }).then(result => {
+        setMicPermission(result.state as "prompt" | "granted" | "denied")
+        result.onchange = () => {
+          setMicPermission(result.state as "prompt" | "granted" | "denied")
+        }
+      }).catch(() => {
+        // Permissions API not fully supported, will request on first use
+      })
+    }
   }, [])
 
   // Update settings
@@ -149,20 +174,43 @@ export function useSmartSOSTriggers({
     return SOS_VOICE_COMMANDS.some(cmd => normalized.includes(cmd))
   }, [])
 
-  // Initialize voice recognition for SOS commands
+  // Request microphone permission and start voice recognition
+  const requestMicrophonePermission = useCallback(async () => {
+    if (hasRequestedMicRef.current) return
+    hasRequestedMicRef.current = true
+    
+    try {
+      // Request microphone access - this will prompt the user
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // Stop the stream immediately, we just needed permission
+      stream.getTracks().forEach(track => track.stop())
+      setMicPermission("granted")
+      return true
+    } catch {
+      setMicPermission("denied")
+      return false
+    }
+  }, [])
+
+  // Initialize voice recognition for SOS commands - auto-starts when enabled
   useEffect(() => {
     if (typeof window === "undefined") return
-    if (!settings.voiceCommandEnabled || !enabled) return
+    if (!settings.voiceCommandEnabled || !enabled) {
+      shouldListenRef.current = false
+      return
+    }
 
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognitionAPI) return
 
+    shouldListenRef.current = true
     const recognition = new SpeechRecognitionAPI()
     recognition.continuous = true
     recognition.interimResults = true
     recognition.lang = "en-US"
 
     recognition.onstart = () => {
+      console.log("[v0] Voice recognition started - listening for commands")
       setIsVoiceListening(true)
     }
 
@@ -170,9 +218,12 @@ export function useSmartSOSTriggers({
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i]
         const transcript = result[0].transcript
+        console.log("[v0] Heard:", transcript)
         
         if (checkForSOSCommand(transcript)) {
+          console.log("[v0] SOS COMMAND DETECTED:", transcript)
           setLastDetectedCommand(transcript)
+          shouldListenRef.current = false
           onTriggerRef.current("voice")
           recognition.stop()
           return
@@ -180,31 +231,80 @@ export function useSmartSOSTriggers({
       }
     }
 
-    recognition.onerror = () => {
-      setIsVoiceListening(false)
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.log("[v0] Voice recognition error:", event.error)
+      // Don't set listening to false on no-speech errors, just restart
+      if (event.error !== "no-speech" && event.error !== "aborted") {
+        setIsVoiceListening(false)
+      }
+      // If permission denied, request it
+      if (event.error === "not-allowed") {
+        requestMicrophonePermission()
+      }
     }
 
     recognition.onend = () => {
+      console.log("[v0] Voice recognition ended, shouldListen:", shouldListenRef.current)
       setIsVoiceListening(false)
-      // Auto-restart if still enabled
-      if (settings.voiceCommandEnabled && enabled) {
-        setTimeout(() => {
+      // Clear any existing restart timeout
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current)
+      }
+      // Auto-restart if still enabled and should be listening
+      if (shouldListenRef.current && settings.voiceCommandEnabled && enabled) {
+        restartTimeoutRef.current = setTimeout(() => {
           try {
+            console.log("[v0] Restarting voice recognition...")
             recognition.start()
-          } catch {
-            // Ignore restart errors
+          } catch (e) {
+            console.log("[v0] Restart error:", e)
+            // If failed due to permission, request it
+            requestMicrophonePermission().then(granted => {
+              if (granted) {
+                try {
+                  recognition.start()
+                } catch {
+                  // Ignore
+                }
+              }
+            })
           }
-        }, 1000)
+        }, 300)
       }
     }
 
     recognitionRef.current = recognition
 
+    // Auto-start voice recognition
+    const startRecognition = async () => {
+      try {
+        console.log("[v0] Starting voice recognition...")
+        recognition.start()
+      } catch (e) {
+        console.log("[v0] Initial start error:", e)
+        // Request microphone permission and try again
+        const granted = await requestMicrophonePermission()
+        if (granted) {
+          try {
+            recognition.start()
+          } catch {
+            // Ignore secondary errors
+          }
+        }
+      }
+    }
+
+    startRecognition()
+
     return () => {
+      shouldListenRef.current = false
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current)
+      }
       recognition.abort()
       recognitionRef.current = null
     }
-  }, [settings.voiceCommandEnabled, enabled, checkForSOSCommand])
+  }, [settings.voiceCommandEnabled, enabled, checkForSOSCommand, requestMicrophonePermission])
 
   // Volume button detection (3 quick presses)
   useEffect(() => {
@@ -297,7 +397,9 @@ export function useSmartSOSTriggers({
     startVoiceListening,
     stopVoiceListening,
     lastDetectedCommand,
-    isSupported
+    isSupported,
+    micPermission,
+    requestMicrophonePermission
   }
 }
 

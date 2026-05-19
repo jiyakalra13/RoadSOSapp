@@ -66,7 +66,7 @@ export default function RoadSOSApp() {
   }, [sosActive])
 
   // Smart SOS triggers (voice commands, volume button, crash detection)
-  const { lastDetectedCommand } = useSmartSOSTriggers({
+  const { lastDetectedCommand, isVoiceListening, settings: smartTriggerSettings, micPermission, requestMicrophonePermission } = useSmartSOSTriggers({
     onTrigger: handleSmartTrigger,
     enabled: !sosActive // Disable triggers when SOS is already active
   })
@@ -154,6 +154,10 @@ export default function RoadSOSApp() {
             requestLocation={requestLocation}
             address={gpsLocation?.address}
             accuracy={gpsLocation?.accuracy}
+            isVoiceListening={isVoiceListening}
+            voiceEnabled={smartTriggerSettings.voiceCommandEnabled}
+            micPermission={micPermission}
+            onRequestMicPermission={requestMicrophonePermission}
           />
         )
       case "services":
@@ -254,6 +258,7 @@ export default function RoadSOSApp() {
         onConfirm={handleConfirmSmartTrigger}
         onCancel={handleCancelSmartTrigger}
         autoConfirmDelay={10}
+        emergencyNumbers={{ ambulance: getEmergencyNumbers().ambulance }}
       />
 
       {/* PWA Install Prompt */}
