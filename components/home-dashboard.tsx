@@ -12,8 +12,9 @@ import {
   Loader2,
   RefreshCw,
   Building2,
-  Mic
-} from "lucide-react"
+  Mic,
+  Footprints,
+  PhoneCall
 import { cn } from "@/lib/utils"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -34,6 +35,7 @@ interface HomeDashboardProps {
   voiceEnabled?: boolean
   micPermission?: "prompt" | "granted" | "denied"
   onRequestMicPermission?: () => void
+  userGender?: string
 }
 
 const services = [
@@ -85,7 +87,8 @@ export function HomeDashboard({
   isVoiceListening,
   voiceEnabled,
   micPermission,
-  onRequestMicPermission
+  onRequestMicPermission,
+  userGender
 }: HomeDashboardProps) {
   const [sosPressed, setSosPressed] = useState(false)
   const [pressTimer, setPressTimer] = useState<NodeJS.Timeout | null>(null)
@@ -390,8 +393,49 @@ export function HomeDashboard({
         </p>
       </div>
 
+      {/* Safety Tools Grid */}
+      <div className={cn("grid gap-3 mt-4 shrink-0", userGender === "female" ? "grid-cols-2" : "grid-cols-1")}>
+        {userGender === "female" && (
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => onServiceSelect("safewalk")}
+            className={cn(
+              "flex items-center gap-3 p-3 rounded-xl",
+              "bg-card border border-primary/30",
+              "shadow-sm active:shadow-none transition-all duration-200"
+            )}
+          >
+            <div className="h-10 w-10 shrink-0 rounded-xl bg-primary/20 flex items-center justify-center">
+              <Footprints className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex flex-col items-start text-left">
+              <span className="text-sm font-semibold text-foreground leading-tight">SafeWalk</span>
+              <span className="text-[10px] text-muted-foreground">Guardian Mode</span>
+            </div>
+          </motion.button>
+        )}
+        
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => onServiceSelect("fakecall")}
+          className={cn(
+            "flex items-center gap-3 p-3 rounded-xl",
+            "bg-card border border-primary/30",
+            "shadow-sm active:shadow-none transition-all duration-200"
+          )}
+        >
+          <div className="h-10 w-10 shrink-0 rounded-xl bg-secondary flex items-center justify-center">
+            <PhoneCall className="h-5 w-5 text-primary" />
+          </div>
+          <div className="flex flex-col items-start text-left">
+            <span className="text-sm font-semibold text-foreground leading-tight">Fake Call</span>
+            <span className="text-[10px] text-muted-foreground">Escape tool</span>
+          </div>
+        </motion.button>
+      </div>
+
       {/* Quick Services Grid */}
-      <div className="grid grid-cols-4 gap-2 mt-4 shrink-0">
+      <div className="grid grid-cols-4 gap-2 mt-3 shrink-0">
         {services.map((service) => {
           const Icon = service.icon
           return (

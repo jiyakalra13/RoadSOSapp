@@ -46,6 +46,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
     phone: "",
     countryCode: "US",
     dateOfBirth: "",
+    gender: "",
     bloodGroup: "",
     allergies: "",
     medicalConditions: "",
@@ -111,7 +112,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
       case "welcome":
         return true
       case "personal":
-        return formData.fullName && formData.phone
+        return !!formData.fullName && !!formData.phone && !!formData.gender
       case "medical":
         return true // Medical info is optional
       case "emergency":
@@ -250,6 +251,26 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
                       type="tel"
                       className="h-11 flex-1"
                     />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-foreground mb-1.5 block">Gender *</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {["Male", "Female", "Custom"].map(gender => (
+                      <Button
+                        key={gender}
+                        variant={formData.gender === gender.toLowerCase() ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => updateField("gender", gender.toLowerCase())}
+                        className={cn(
+                          "h-10 text-xs",
+                          formData.gender === gender.toLowerCase() && "bg-primary text-primary-foreground hover:bg-primary/90"
+                        )}
+                      >
+                        {gender}
+                      </Button>
+                    ))}
                   </div>
                 </div>
 
@@ -514,6 +535,10 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
                     <span className="text-xs font-medium text-foreground">
                       {selectedCountry.flag} {selectedCountry.name}
                     </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-muted-foreground">Gender</span>
+                    <span className="text-xs font-medium text-foreground capitalize">{formData.gender || "-"}</span>
                   </div>
                 </div>
               </Card>

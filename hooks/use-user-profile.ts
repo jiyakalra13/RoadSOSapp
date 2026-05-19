@@ -10,6 +10,7 @@ export interface UserProfile {
   phone: string
   countryCode: string
   dateOfBirth: string
+  gender?: string
   
   // Medical Info
   bloodGroup: string
@@ -44,6 +45,7 @@ const defaultProfile: UserProfile = {
   phone: "",
   countryCode: "US",
   dateOfBirth: "",
+  gender: "",
   bloodGroup: "",
   allergies: "",
   medicalConditions: "",

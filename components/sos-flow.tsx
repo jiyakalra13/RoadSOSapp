@@ -46,6 +46,7 @@ interface SOSFlowProps {
   emergencyContacts?: Array<{ id: string; name: string; phone: string; relationship: string }>
   isOnline?: boolean
   userName?: string
+  countdownDuration?: number
   autoCalledAmbulance?: boolean
   bloodGroup?: string
   medicalConditions?: string
@@ -74,13 +75,14 @@ export function SOSFlow({
   emergencyContacts = [],
   isOnline = true,
   userName,
+  countdownDuration = 5,
   autoCalledAmbulance = false,
   bloodGroup,
   medicalConditions,
   allergies
 }: SOSFlowProps) {
   const [step, setStep] = useState<SOSStep>("countdown")
-  const [countdown, setCountdown] = useState(5)
+  const [countdown, setCountdown] = useState(countdownDuration)
   const [stepStatus, setStepStatus] = useState<StepStatus>({
     detecting: "pending",
     sharing: "pending",
@@ -212,7 +214,7 @@ export function SOSFlow({
   useEffect(() => {
     if (!isActive) {
       setStep("countdown")
-      setCountdown(5)
+      setCountdown(countdownDuration)
       setStepStatus({
         detecting: "pending",
         sharing: "pending",
@@ -399,7 +401,7 @@ export function SOSFlow({
                 transition={{ duration: 0.6, repeat: Infinity }}
                 className="text-xl font-bold mb-1"
               >
-                Sending alerts...
+                {countdownDuration > 5 ? "Are you safe?" : "Sending alerts..."}
               </motion.h2>
               <p className="text-sm opacity-80 mb-6">Press cancel to stop</p>
               
@@ -457,8 +459,17 @@ export function SOSFlow({
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col items-center text-center w-full overflow-y-auto max-h-full py-4"
+              className="flex flex-col items-center text-center w-full overflow-y-auto max-h-full py-4 relative z-10"
             >
+              {/* Flashing Red Background for Active Mode */}
+              <motion.div
+                animate={{ 
+                  backgroundColor: ["rgba(255,0,0,0)", "rgba(255,0,0,0.3)", "rgba(255,0,0,0)"]
+                }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="fixed inset-0 pointer-events-none -z-10"
+              />
+              
               {/* Animated SOS ACTIVATED Banner */}
               <motion.div
                 animate={{ 
@@ -738,9 +749,9 @@ export function SOSFlow({
                 variant="outline"
                 size="lg"
                 onClick={onCancel}
-                className="bg-success border-success text-success-foreground hover:bg-success/90 hover:text-success-foreground mt-2"
+                className="bg-destructive border-destructive text-destructive-foreground hover:bg-destructive/90 hover:text-destructive-foreground mt-2 w-full max-w-xs font-bold text-lg h-14 uppercase tracking-wider"
               >
-                I&apos;m Safe Now
+                STOP SOS
               </Button>
             </motion.div>
           )}

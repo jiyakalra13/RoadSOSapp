@@ -10,6 +10,9 @@ import { ProfileScreen } from "@/components/profile-screen"
 import { ServicesOverview } from "@/components/services-overview"
 import { SettingsScreen } from "@/components/settings-screen"
 import { OnboardingScreen } from "@/components/onboarding-screen"
+import { SafeWalkMode } from "@/components/safewalk-mode"
+import { FakeCallSetup } from "@/components/fake-call-setup"
+import { FakeCallScreen } from "@/components/fake-call-screen"
 import { NetworkStatusIndicator } from "@/components/network-status-indicator"
 import { SOSConfirmationOverlay } from "@/components/sos-confirmation-overlay"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
@@ -27,6 +30,9 @@ type ActiveView =
   | "firstaid" 
   | "profile"
   | "settings"
+  | "safewalk"
+  | "fakecall-setup"
+  | "fakecall-active"
 
 export default function RoadSOSApp() {
   const [activeTab, setActiveTab] = useState("home")
@@ -37,6 +43,8 @@ export default function RoadSOSApp() {
   // Smart SOS trigger confirmation state
   const [showSOSConfirmation, setShowSOSConfirmation] = useState(false)
   const [sosTriggerType, setSOSTriggerType] = useState<"voice" | "volume" | "crash" | "shake" | null>(null)
+  const [sosCountdownDuration, setSosCountdownDuration] = useState(5)
+  const [fakeCallConfig, setFakeCallConfig] = useState<{ callerName: string; delay: number }>({ callerName: "Mom", delay: 5 })
   
   // Network status management with detailed states
   const { status: networkStatus, isOnline } = useNetworkStatus()
@@ -69,6 +77,10 @@ export default function RoadSOSApp() {
   const handleSmartTrigger = useCallback((triggerType: "voice" | "volume" | "crash" | "shake", command?: string) => {
     if (sosActive) return // Don't trigger if SOS is already active
     
+    // Check if SafeWalk mode is active to apply 10s countdown
+    const isSafeWalk = activeView === "safewalk"
+    setSosCountdownDuration(isSafeWalk ? 10 : 5)
+
     // For volume button trigger, directly activate SOS and call ambulance
     if (triggerType === "volume") {
       setSOSActive(true)
@@ -119,6 +131,10 @@ export default function RoadSOSApp() {
     if (service === "firstaid") {
       setActiveTab("firstaid")
       setActiveView("firstaid")
+    } else if (service === "safewalk") {
+      setActiveView("safewalk")
+    } else if (service === "fakecall") {
+      setActiveView("fakecall-setup")
     } else if (service === "vehicle" || service === "ambulance" || service === "police") {
       setActiveView(`services-${service}` as ActiveView)
     }
@@ -195,6 +211,7 @@ export default function RoadSOSApp() {
             voiceEnabled={smartTriggerSettings.voiceCommandEnabled}
             micPermission={micPermission}
             onRequestMicPermission={requestMicrophonePermission}
+            userGender={profile?.gender}
           />
         )
       case "services":
@@ -248,6 +265,33 @@ export default function RoadSOSApp() {
         return (
           <SettingsScreen onBack={handleBack} />
         )
+      case "safewalk":
+        return (
+          <SafeWalkMode 
+            onBack={handleBack}
+            location={location}
+            locationLoading={locationLoading}
+            isOnline={isOnline}
+          />
+        )
+      case "fakecall-setup":
+        return (
+          <FakeCallSetup 
+            onBack={handleBack}
+            onStartCall={(callerName, delay) => {
+              setFakeCallConfig({ callerName, delay })
+              setActiveView("fakecall-active")
+            }}
+          />
+        )
+      case "fakecall-active":
+        return (
+          <FakeCallScreen 
+            callerName={fakeCallConfig.callerName}
+            delaySeconds={fakeCallConfig.delay}
+            onEndCall={handleBack}
+          />
+        )
       default:
         return null
     }
@@ -277,6 +321,7 @@ export default function RoadSOSApp() {
       {/* SOS Flow Overlay */}
       <SOSFlow
         isActive={sosActive}
+        countdownDuration={sosCountdownDuration}
         onCancel={handleSOSCancel}
         onComplete={handleSOSComplete}
         location={location}
@@ -298,7 +343,7 @@ export default function RoadSOSApp() {
         detectedCommand={lastDetectedCommand}
         onConfirm={handleConfirmSmartTrigger}
         onCancel={handleCancelSmartTrigger}
-        autoConfirmDelay={10}
+        autoConfirmDelay={sosCountdownDuration}
         emergencyNumbers={{ ambulance: getEmergencyNumbers().ambulance }}
         userName={profile?.fullName}
         bloodGroup={profile?.bloodGroup}
