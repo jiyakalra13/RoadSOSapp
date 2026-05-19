@@ -36,7 +36,7 @@ export default function RoadSOSApp() {
   
   // Smart SOS trigger confirmation state
   const [showSOSConfirmation, setShowSOSConfirmation] = useState(false)
-  const [sosTriggerType, setSOSTriggerType] = useState<"voice" | "volume" | "crash" | null>(null)
+  const [sosTriggerType, setSOSTriggerType] = useState<"voice" | "volume" | "crash" | "shake" | null>(null)
   
   // Network status management with detailed states
   const { status: networkStatus, isOnline } = useNetworkStatus()
@@ -66,7 +66,7 @@ export default function RoadSOSApp() {
   }, [getEmergencyNumbers])
 
   // Smart SOS trigger handler
-  const handleSmartTrigger = useCallback((triggerType: "voice" | "volume" | "crash") => {
+  const handleSmartTrigger = useCallback((triggerType: "voice" | "volume" | "crash" | "shake", command?: string) => {
     if (sosActive) return // Don't trigger if SOS is already active
     
     // For volume button trigger, directly activate SOS and call ambulance
@@ -79,11 +79,27 @@ export default function RoadSOSApp() {
       }, 500)
       return
     }
+
+    if (triggerType === "voice" && command) {
+      const normalized = command.toLowerCase()
+      const emergencyNums = getEmergencyNumbers()
+      
+      // Initiate call directly if command specifies who to call
+      if (normalized.includes("police")) {
+        window.location.href = `tel:${emergencyNums.police}`
+        return
+      } else if (normalized.includes("ambulance")) {
+        window.location.href = `tel:${emergencyNums.ambulance}`
+        return
+      } else if (normalized.includes("fire")) {
+        window.location.href = `tel:${emergencyNums.fire}`
+        return
+      }
+    }
     
-    // For other triggers, show confirmation
     setSOSTriggerType(triggerType)
     setShowSOSConfirmation(true)
-  }, [sosActive, callAmbulance])
+  }, [sosActive, callAmbulance, getEmergencyNumbers])
 
   // Smart SOS triggers (voice commands, volume button, crash detection)
   const { lastDetectedCommand, isVoiceListening, settings: smartTriggerSettings, micPermission, requestMicrophonePermission } = useSmartSOSTriggers({
@@ -270,6 +286,9 @@ export default function RoadSOSApp() {
         isOnline={isOnline}
         userName={profile?.fullName}
         autoCalledAmbulance={autoCalledAmbulance}
+        bloodGroup={profile?.bloodGroup}
+        medicalConditions={profile?.medicalConditions}
+        allergies={profile?.allergies}
       />
 
       {/* Smart SOS Trigger Confirmation Overlay */}
@@ -281,6 +300,11 @@ export default function RoadSOSApp() {
         onCancel={handleCancelSmartTrigger}
         autoConfirmDelay={10}
         emergencyNumbers={{ ambulance: getEmergencyNumbers().ambulance }}
+        userName={profile?.fullName}
+        bloodGroup={profile?.bloodGroup}
+        medicalConditions={profile?.medicalConditions}
+        allergies={profile?.allergies}
+        emergencyContacts={profile?.emergencyContacts || []}
       />
 
       {/* PWA Install Prompt */}

@@ -18,7 +18,11 @@ import {
   Wifi,
   WifiOff,
   Send,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown,
+  Heart,
+  Pill,
+  AlertCircle
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -43,6 +47,9 @@ interface SOSFlowProps {
   isOnline?: boolean
   userName?: string
   autoCalledAmbulance?: boolean
+  bloodGroup?: string
+  medicalConditions?: string
+  allergies?: string
 }
 
 type SOSStep = "countdown" | "sending" | "active"
@@ -67,7 +74,10 @@ export function SOSFlow({
   emergencyContacts = [],
   isOnline = true,
   userName,
-  autoCalledAmbulance = false
+  autoCalledAmbulance = false,
+  bloodGroup,
+  medicalConditions,
+  allergies
 }: SOSFlowProps) {
   const [step, setStep] = useState<SOSStep>("countdown")
   const [countdown, setCountdown] = useState(5)
@@ -78,6 +88,9 @@ export function SOSFlow({
   })
   const [smsSent, setSmsSent] = useState(false)
   const [lastSentLocation, setLastSentLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [showDetails, setShowDetails] = useState(false)
+  const [detailsUnlocked, setDetailsUnlocked] = useState(false)
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null)
   
   // SOS sound and vibration effects
   const { startEffects, stopEffects, playBeep } = useSOSEffects({
@@ -88,15 +101,16 @@ export function SOSFlow({
   
   const { 
     smsStatuses, 
-    isSending: isSendingSms, 
     sendToAllContacts, 
     getShareableMessage,
-    reset: resetSms 
+    reset: resetSms,
+    startLiveUpdates,
+    stopLiveUpdates
   } = useEmergencySMS()
   
   const hasSentInitialSmsRef = useRef(false)
 
-  // Start/stop effects based on SOS state
+  // Start/stop effects and live updates based on SOS state
   useEffect(() => {
     if (isActive && (step === "countdown" || step === "sending" || step === "active")) {
       startEffects()
@@ -104,10 +118,71 @@ export function SOSFlow({
       stopEffects()
     }
     
+    if (isActive && step === "active") {
+      startLiveUpdates(emergencyContacts, () => location ? { lat: location.lat, lng: location.lng, address } : null, userName, 10000)
+    } else {
+      stopLiveUpdates()
+    }
+    
     return () => {
       stopEffects()
+      stopLiveUpdates()
     }
-  }, [isActive, step, startEffects, stopEffects])
+  }, [isActive, step, startEffects, stopEffects, startLiveUpdates, stopLiveUpdates, emergencyContacts, location, address, userName])
+
+  // Wake Lock - Keep screen on during SOS until user selects "Safe"
+  useEffect(() => {
+    const requestWakeLock = async () => {
+      if (isActive && 'wakeLock' in navigator) {
+        try {
+          wakeLockRef.current = await navigator.wakeLock.request('screen')
+        } catch {
+          // Wake lock request failed - silently ignore
+        }
+      }
+    }
+
+    const releaseWakeLock = async () => {
+      if (wakeLockRef.current) {
+        try {
+          await wakeLockRef.current.release()
+          wakeLockRef.current = null
+        } catch {
+          // Ignore release errors
+        }
+      }
+    }
+
+    if (isActive) {
+      requestWakeLock()
+    } else {
+      releaseWakeLock()
+    }
+
+    // Re-acquire wake lock if visibility changes
+    const handleVisibilityChange = () => {
+      if (isActive && document.visibilityState === 'visible') {
+        requestWakeLock()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      releaseWakeLock()
+    }
+  }, [isActive])
+
+  // Timer to unlock details card 5 seconds after entering active phase
+  useEffect(() => {
+    if (step === "active" && !detailsUnlocked) {
+      const timer = setTimeout(() => {
+        setDetailsUnlocked(true)
+      }, 5000) // 5 seconds
+      return () => clearTimeout(timer)
+    }
+  }, [step, detailsUnlocked])
 
   // Play beep on countdown change
   useEffect(() => {
@@ -145,6 +220,8 @@ export function SOSFlow({
       })
       setSmsSent(false)
       setLastSentLocation(null)
+      setShowDetails(false)
+      setDetailsUnlocked(false)
       hasSentInitialSmsRef.current = false
       resetSmsRef.current()
       stopEffects() // Stop sounds and vibration
@@ -322,7 +399,7 @@ export function SOSFlow({
                 transition={{ duration: 0.6, repeat: Infinity }}
                 className="text-xl font-bold mb-1"
               >
-                Sending Alert...
+                Sending alerts...
               </motion.h2>
               <p className="text-sm opacity-80 mb-6">Press cancel to stop</p>
               
@@ -353,7 +430,7 @@ export function SOSFlow({
                 <Loader2 className="h-8 w-8 animate-spin" />
               </motion.div>
               
-              <h2 className="text-xl font-bold mb-4">Sending Alert</h2>
+              <h2 className="text-xl font-bold mb-4">Sending alerts...</h2>
               
               <div className="w-full space-y-2">
                 <StatusItem
@@ -363,12 +440,12 @@ export function SOSFlow({
                 />
                 <StatusItem
                   icon={Share2}
-                  label="Sharing location"
+                  label="Sharing live location..."
                   status={stepStatus.sharing}
                 />
                 <StatusItem
                   icon={Bell}
-                  label="Alerting services"
+                  label="Emergency contacts notified"
                   status={stepStatus.alerting}
                 />
               </div>
@@ -497,6 +574,103 @@ export function SOSFlow({
                     )}
                   </div>
                 </div>
+              )}
+
+              {/* Personal Details Collapsible Card - Shows after 5 seconds */}
+              {detailsUnlocked && (userName || bloodGroup || medicalConditions || allergies || emergencyContacts.length > 0) && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="w-full max-w-xs mb-3"
+                >
+                  <button
+                    onClick={() => setShowDetails(!showDetails)}
+                    className="w-full bg-white/10 rounded-xl p-3 flex items-center justify-between hover:bg-white/15 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      <span className="text-sm font-semibold">Personal Details</span>
+                    </div>
+                    <motion.div
+                      animate={{ rotate: showDetails ? 180 : 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </motion.div>
+                  </button>
+                  
+                  <AnimatePresence>
+                    {showDetails && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="bg-white/5 rounded-b-xl p-3 space-y-2 text-left border-t border-white/10 mt-0.5">
+                          {/* Name */}
+                          {userName && (
+                            <div className="flex items-start gap-2">
+                              <User className="h-3 w-3 shrink-0 mt-0.5 opacity-70" />
+                              <div>
+                                <p className="text-[10px] opacity-70">Name</p>
+                                <p className="text-xs font-medium">{userName}</p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Blood Group */}
+                          {bloodGroup && (
+                            <div className="flex items-start gap-2">
+                              <Heart className="h-3 w-3 shrink-0 mt-0.5 opacity-70" />
+                              <div>
+                                <p className="text-[10px] opacity-70">Blood Group</p>
+                                <p className="text-xs font-medium">{bloodGroup}</p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Medical Conditions */}
+                          {medicalConditions && (
+                            <div className="flex items-start gap-2">
+                              <Pill className="h-3 w-3 shrink-0 mt-0.5 opacity-70" />
+                              <div>
+                                <p className="text-[10px] opacity-70">Medical Conditions</p>
+                                <p className="text-xs font-medium">{medicalConditions}</p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Allergies */}
+                          {allergies && (
+                            <div className="flex items-start gap-2">
+                              <AlertCircle className="h-3 w-3 shrink-0 mt-0.5 opacity-70" />
+                              <div>
+                                <p className="text-[10px] opacity-70">Allergies</p>
+                                <p className="text-xs font-medium">{allergies}</p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Primary Emergency Contact */}
+                          {emergencyContacts.length > 0 && (
+                            <div className="flex items-start gap-2">
+                              <Phone className="h-3 w-3 shrink-0 mt-0.5 opacity-70" />
+                              <div>
+                                <p className="text-[10px] opacity-70">Emergency Contact</p>
+                                <p className="text-xs font-medium">
+                                  {emergencyContacts[0].name} ({emergencyContacts[0].relationship})
+                                </p>
+                                <p className="text-[10px] opacity-80">{emergencyContacts[0].phone}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
               )}
 
               {/* Send Location Update Button */}

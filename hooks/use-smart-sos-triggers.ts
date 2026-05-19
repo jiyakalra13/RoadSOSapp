@@ -9,12 +9,14 @@ export interface SmartTriggerSettings {
   voiceCommandEnabled: boolean
   volumeButtonEnabled: boolean
   crashDetectionEnabled: boolean
+  shakeDetectionEnabled: boolean
 }
 
 const defaultSettings: SmartTriggerSettings = {
   voiceCommandEnabled: true, // Enabled by default for hands-free SOS
   volumeButtonEnabled: true,
-  crashDetectionEnabled: true
+  crashDetectionEnabled: true,
+  shakeDetectionEnabled: true
 }
 
 // Voice command phrases that trigger SOS
@@ -35,7 +37,7 @@ const SOS_VOICE_COMMANDS = [
 ]
 
 interface UseSmartSOSTriggersOptions {
-  onTrigger: (triggerType: "voice" | "volume" | "crash") => void
+  onTrigger: (triggerType: "voice" | "volume" | "crash" | "shake", command?: string) => void
   enabled?: boolean
 }
 
@@ -50,6 +52,7 @@ interface SmartSOSTriggersResult {
     voice: boolean
     volume: boolean
     crash: boolean
+    shake: boolean
   }
   micPermission: "prompt" | "granted" | "denied"
   requestMicrophonePermission: () => Promise<boolean>
@@ -105,7 +108,8 @@ export function useSmartSOSTriggers({
   const [isSupported, setIsSupported] = useState({
     voice: false,
     volume: true, // Volume detection via keydown is widely supported
-    crash: false
+    crash: false,
+    shake: false
   })
 
   const recognitionRef = useRef<SpeechRecognition | null>(null)
@@ -116,6 +120,8 @@ export function useSmartSOSTriggers({
   const shouldListenRef = useRef(false)
   const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const hasRequestedMicRef = useRef(false)
+  const consecutiveErrorsRef = useRef(0)
+  const maxConsecutiveErrors = 3 // Stop trying after 3 consecutive errors
 
   // Keep trigger ref updated
   useEffect(() => {
@@ -143,7 +149,8 @@ export function useSmartSOSTriggers({
     setIsSupported({
       voice: !!SpeechRecognitionAPI,
       volume: true,
-      crash: "DeviceMotionEvent" in window
+      crash: "DeviceMotionEvent" in window,
+      shake: "DeviceMotionEvent" in window
     })
 
     // Check and request microphone permission
@@ -212,6 +219,7 @@ export function useSmartSOSTriggers({
     recognition.onstart = () => {
       console.log("[v0] Voice recognition started - listening for commands")
       setIsVoiceListening(true)
+      consecutiveErrorsRef.current = 0 // Reset error counter on successful start
     }
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -224,7 +232,7 @@ export function useSmartSOSTriggers({
           console.log("[v0] SOS COMMAND DETECTED:", transcript)
           setLastDetectedCommand(transcript)
           shouldListenRef.current = false
-          onTriggerRef.current("voice")
+          onTriggerRef.current("voice", transcript)
           recognition.stop()
           return
         }
@@ -233,13 +241,18 @@ export function useSmartSOSTriggers({
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.log("[v0] Voice recognition error:", event.error)
+      consecutiveErrorsRef.current++
+      
       // Don't set listening to false on no-speech errors, just restart
       if (event.error !== "no-speech" && event.error !== "aborted") {
         setIsVoiceListening(false)
       }
-      // If permission denied, request it
+      
+      // If permission denied or too many errors, stop trying to restart
       if (event.error === "not-allowed") {
-        requestMicrophonePermission()
+        shouldListenRef.current = false // Stop restart loop
+        setMicPermission("denied")
+        console.log("[v0] Microphone permission denied - stopping voice recognition")
       }
     }
 
@@ -250,47 +263,44 @@ export function useSmartSOSTriggers({
       if (restartTimeoutRef.current) {
         clearTimeout(restartTimeoutRef.current)
       }
-      // Auto-restart if still enabled and should be listening
-      if (shouldListenRef.current && settings.voiceCommandEnabled && enabled) {
+      // Auto-restart if still enabled, should be listening, and haven't hit error limit
+      if (shouldListenRef.current && settings.voiceCommandEnabled && enabled && consecutiveErrorsRef.current < maxConsecutiveErrors) {
         restartTimeoutRef.current = setTimeout(() => {
           try {
             console.log("[v0] Restarting voice recognition...")
             recognition.start()
           } catch (e) {
             console.log("[v0] Restart error:", e)
-            // If failed due to permission, request it
-            requestMicrophonePermission().then(granted => {
-              if (granted) {
-                try {
-                  recognition.start()
-                } catch {
-                  // Ignore
-                }
-              }
-            })
+            consecutiveErrorsRef.current++
+            // Stop trying if we've hit the error limit
+            if (consecutiveErrorsRef.current >= maxConsecutiveErrors) {
+              console.log("[v0] Too many consecutive errors, stopping voice recognition")
+              shouldListenRef.current = false
+            }
           }
         }, 300)
+      } else if (consecutiveErrorsRef.current >= maxConsecutiveErrors) {
+        console.log("[v0] Stopping voice recognition due to repeated errors")
       }
     }
 
     recognitionRef.current = recognition
 
-    // Auto-start voice recognition
+    // Auto-start voice recognition only if we have permission or haven't been denied
     const startRecognition = async () => {
+      // Don't start if permission was already denied
+      if (micPermission === "denied") {
+        console.log("[v0] Skipping voice recognition - microphone permission denied")
+        shouldListenRef.current = false
+        return
+      }
+      
       try {
         console.log("[v0] Starting voice recognition...")
         recognition.start()
       } catch (e) {
         console.log("[v0] Initial start error:", e)
-        // Request microphone permission and try again
-        const granted = await requestMicrophonePermission()
-        if (granted) {
-          try {
-            recognition.start()
-          } catch {
-            // Ignore secondary errors
-          }
-        }
+        consecutiveErrorsRef.current++
       }
     }
 
@@ -339,13 +349,20 @@ export function useSmartSOSTriggers({
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [settings.volumeButtonEnabled, enabled])
 
-  // Crash detection via accelerometer
+  // Crash & Shake detection via accelerometer
   useEffect(() => {
-    if (!settings.crashDetectionEnabled || !enabled) return
+    if ((!settings.crashDetectionEnabled && !settings.shakeDetectionEnabled) || !enabled) return
     if (typeof window === "undefined" || !("DeviceMotionEvent" in window)) return
 
     let lastAcceleration = { x: 0, y: 0, z: 0 }
+    let lastTime = Date.now()
+    let shakeCount = 0
+    let lastShakeTime = 0
+    
     const CRASH_THRESHOLD = 30 // G-force threshold for crash detection
+    const SHAKE_THRESHOLD = 15 // G-force threshold for shake
+    const SHAKE_TIMEOUT = 1000 // Reset shake count after 1s
+    const REQUIRED_SHAKES = 4 // Number of shakes required
 
     const handleMotion = (event: DeviceMotionEvent) => {
       const acceleration = event.accelerationIncludingGravity
@@ -356,9 +373,25 @@ export function useSmartSOSTriggers({
       const deltaZ = Math.abs((acceleration.z || 0) - lastAcceleration.z)
       
       const totalDelta = Math.sqrt(deltaX ** 2 + deltaY ** 2 + deltaZ ** 2)
+      const now = Date.now()
 
-      if (totalDelta > CRASH_THRESHOLD) {
+      if (settings.crashDetectionEnabled && totalDelta > CRASH_THRESHOLD) {
         onTriggerRef.current("crash")
+      }
+
+      if (settings.shakeDetectionEnabled && totalDelta > SHAKE_THRESHOLD) {
+        if (now - lastTime > 100) { // Debounce
+          if (now - lastShakeTime > SHAKE_TIMEOUT) {
+            shakeCount = 0 // reset if too much time passed
+          }
+          shakeCount++
+          lastShakeTime = now
+          
+          if (shakeCount >= REQUIRED_SHAKES) {
+            shakeCount = 0
+            onTriggerRef.current("shake")
+          }
+        }
       }
 
       lastAcceleration = {
@@ -366,11 +399,12 @@ export function useSmartSOSTriggers({
         y: acceleration.y || 0,
         z: acceleration.z || 0
       }
+      lastTime = now
     }
 
     window.addEventListener("devicemotion", handleMotion)
     return () => window.removeEventListener("devicemotion", handleMotion)
-  }, [settings.crashDetectionEnabled, enabled])
+  }, [settings.crashDetectionEnabled, settings.shakeDetectionEnabled, enabled])
 
   const startVoiceListening = useCallback(() => {
     if (!recognitionRef.current || isVoiceListening) return
