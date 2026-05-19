@@ -11,7 +11,8 @@ import {
   AlertTriangle,
   Loader2,
   RefreshCw,
-  Building2
+  Building2,
+  Mic
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Card } from "@/components/ui/card"
@@ -29,6 +30,8 @@ interface HomeDashboardProps {
   requestLocation?: () => void
   address?: string
   accuracy?: number
+  isVoiceListening?: boolean
+  voiceEnabled?: boolean
 }
 
 const services = [
@@ -76,7 +79,9 @@ export function HomeDashboard({
   permissionStatus,
   requestLocation,
   address,
-  accuracy
+  accuracy,
+  isVoiceListening,
+  voiceEnabled
 }: HomeDashboardProps) {
   const [sosPressed, setSosPressed] = useState(false)
   const [pressTimer, setPressTimer] = useState<NodeJS.Timeout | null>(null)
@@ -409,14 +414,45 @@ export function HomeDashboard({
         })}
       </div>
 
+      {/* Voice Listening Indicator */}
+      {voiceEnabled && (
+        <Card className="flex items-center justify-center gap-2 p-2 mt-3 bg-primary/5 border-primary/20 shrink-0">
+          <motion.div
+            animate={isVoiceListening ? { scale: [1, 1.2, 1], opacity: [1, 0.7, 1] } : {}}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className={cn(
+              "h-2 w-2 rounded-full",
+              isVoiceListening ? "bg-primary" : "bg-muted-foreground"
+            )}
+          />
+          <Mic className={cn(
+            "h-3.5 w-3.5",
+            isVoiceListening ? "text-primary" : "text-muted-foreground"
+          )} />
+          <span className={cn(
+            "text-[10px] font-medium",
+            isVoiceListening ? "text-primary" : "text-muted-foreground"
+          )}>
+            {isVoiceListening ? "Listening for \"Help me\", \"Call ambulance\"..." : "Voice detection starting..."}
+          </span>
+        </Card>
+      )}
+
       {/* Feature indicators */}
-      <div className="flex items-center justify-center gap-3 mt-3 text-[10px] text-muted-foreground shrink-0">
+      <div className="flex items-center justify-center gap-3 mt-2 text-[10px] text-muted-foreground shrink-0">
         <div className="flex items-center gap-1">
           <div className="h-1.5 w-1.5 rounded-full bg-success" />
           Motion
         </div>
         <div className="flex items-center gap-1">
-          <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+          <motion.div 
+            animate={isVoiceListening ? { scale: [1, 1.3, 1] } : {}}
+            transition={{ duration: 1, repeat: Infinity }}
+            className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              isVoiceListening ? "bg-primary" : "bg-muted-foreground"
+            )}
+          />
           Voice
         </div>
         <div className="flex items-center gap-1">

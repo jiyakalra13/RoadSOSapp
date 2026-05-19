@@ -66,7 +66,7 @@ export default function RoadSOSApp() {
   }, [sosActive])
 
   // Smart SOS triggers (voice commands, volume button, crash detection)
-  const { lastDetectedCommand } = useSmartSOSTriggers({
+  const { lastDetectedCommand, isVoiceListening, settings: smartTriggerSettings } = useSmartSOSTriggers({
     onTrigger: handleSmartTrigger,
     enabled: !sosActive // Disable triggers when SOS is already active
   })
@@ -154,6 +154,8 @@ export default function RoadSOSApp() {
             requestLocation={requestLocation}
             address={gpsLocation?.address}
             accuracy={gpsLocation?.accuracy}
+            isVoiceListening={isVoiceListening}
+            voiceEnabled={smartTriggerSettings.voiceCommandEnabled}
           />
         )
       case "services":

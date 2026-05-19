@@ -12,7 +12,7 @@ export interface SmartTriggerSettings {
 }
 
 const defaultSettings: SmartTriggerSettings = {
-  voiceCommandEnabled: false,
+  voiceCommandEnabled: true, // Enabled by default for hands-free SOS
   volumeButtonEnabled: true,
   crashDetectionEnabled: true
 }
@@ -26,7 +26,12 @@ const SOS_VOICE_COMMANDS = [
   "call ambulance",
   "emergency",
   "call police",
-  "i need help"
+  "i need help",
+  "sos",
+  "save me",
+  "accident",
+  "crash",
+  "call for help"
 ]
 
 interface UseSmartSOSTriggersOptions {
@@ -104,6 +109,10 @@ export function useSmartSOSTriggers({
   const volumePressTimesRef = useRef<number[]>([])
   const onTriggerRef = useRef(onTrigger)
 
+  // Track if voice recognition should be running
+  const shouldListenRef = useRef(false)
+  const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
   // Keep trigger ref updated
   useEffect(() => {
     onTriggerRef.current = onTrigger
@@ -149,14 +158,18 @@ export function useSmartSOSTriggers({
     return SOS_VOICE_COMMANDS.some(cmd => normalized.includes(cmd))
   }, [])
 
-  // Initialize voice recognition for SOS commands
+  // Initialize voice recognition for SOS commands - auto-starts when enabled
   useEffect(() => {
     if (typeof window === "undefined") return
-    if (!settings.voiceCommandEnabled || !enabled) return
+    if (!settings.voiceCommandEnabled || !enabled) {
+      shouldListenRef.current = false
+      return
+    }
 
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognitionAPI) return
 
+    shouldListenRef.current = true
     const recognition = new SpeechRecognitionAPI()
     recognition.continuous = true
     recognition.interimResults = true
@@ -173,6 +186,7 @@ export function useSmartSOSTriggers({
         
         if (checkForSOSCommand(transcript)) {
           setLastDetectedCommand(transcript)
+          shouldListenRef.current = false
           onTriggerRef.current("voice")
           recognition.stop()
           return
@@ -180,27 +194,45 @@ export function useSmartSOSTriggers({
       }
     }
 
-    recognition.onerror = () => {
-      setIsVoiceListening(false)
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      // Don't set listening to false on no-speech errors, just restart
+      if (event.error !== "no-speech" && event.error !== "aborted") {
+        setIsVoiceListening(false)
+      }
     }
 
     recognition.onend = () => {
       setIsVoiceListening(false)
-      // Auto-restart if still enabled
-      if (settings.voiceCommandEnabled && enabled) {
-        setTimeout(() => {
+      // Clear any existing restart timeout
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current)
+      }
+      // Auto-restart if still enabled and should be listening
+      if (shouldListenRef.current && settings.voiceCommandEnabled && enabled) {
+        restartTimeoutRef.current = setTimeout(() => {
           try {
             recognition.start()
           } catch {
-            // Ignore restart errors
+            // Ignore restart errors, will retry on next cycle
           }
-        }, 1000)
+        }, 500)
       }
     }
 
     recognitionRef.current = recognition
 
+    // Auto-start voice recognition
+    try {
+      recognition.start()
+    } catch {
+      // May already be started
+    }
+
     return () => {
+      shouldListenRef.current = false
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current)
+      }
       recognition.abort()
       recognitionRef.current = null
     }
