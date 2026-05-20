@@ -1,0 +1,24 @@
+[
+  {
+    "userId": "Jane Doe",
+    "triggerType": "Volume Buttons Trigger",
+    "location": {
+      "lat": 18.5204,
+      "lng": 73.8567,
+      "address": "Pune, Maharashtra, India",
+      "timestamp": null
+    },
+    "time": "2026-05-20T12:00:00Z",
+    "contacts": [
+      {
+        "id": "contact-1",
+        "name": "Emergency Contact 1",
+        "phone": "9999988888",
+        "relationship": "Brother"
+      }
+    ],
+    "status": "active",
+    "messageBody": "EMERGENCY: Jane Doe needs help!",
+    "server_timestamp": "2026-05-20T06:57:00.368111Z"
+  }
+]

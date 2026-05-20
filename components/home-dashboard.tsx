@@ -36,6 +36,7 @@ interface HomeDashboardProps {
   voiceEnabled?: boolean
   micPermission?: "prompt" | "granted" | "denied"
   onRequestMicPermission?: () => void
+  audioLevel?: number
   userGender?: string
 }
 
@@ -89,6 +90,7 @@ export function HomeDashboard({
   voiceEnabled,
   micPermission,
   onRequestMicPermission,
+  audioLevel = 0,
   userGender
 }: HomeDashboardProps) {
   const [sosPressed, setSosPressed] = useState(false)
@@ -463,53 +465,153 @@ export function HomeDashboard({
         })}
       </div>
 
-      {/* Voice Listening Indicator */}
+      {/* Voice Listening Card */}
       {voiceEnabled && (
         <Card 
           className={cn(
-            "flex items-center justify-center gap-2 p-2 mt-3 shrink-0 cursor-pointer",
+            "p-3.5 mt-3 shrink-0 transition-all duration-300 relative overflow-hidden",
             micPermission === "denied" 
-              ? "bg-destructive/5 border-destructive/20" 
-              : "bg-primary/5 border-primary/20"
+              ? "bg-destructive/5 border-destructive/20 shadow-destructive/5" 
+              : isVoiceListening 
+                ? "bg-primary/5 border-primary/40 shadow-md shadow-primary/5" 
+                : "bg-card border-border/50"
           )}
           onClick={micPermission !== "granted" ? onRequestMicPermission : undefined}
         >
-          <motion.div
-            animate={isVoiceListening ? { scale: [1, 1.2, 1], opacity: [1, 0.7, 1] } : {}}
-            transition={{ duration: 1.5, repeat: Infinity }}
-            className={cn(
-              "h-2 w-2 rounded-full",
+          {/* Decorative subtle background glow when active */}
+          {isVoiceListening && (
+            <div className="absolute -right-10 -bottom-10 w-24 h-24 rounded-full bg-primary/10 blur-xl pointer-events-none" />
+          )}
+
+          <div className="flex items-start justify-between gap-3 mb-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="relative flex h-2 w-2">
+                  <span className={cn(
+                    "animate-ping absolute inline-flex h-full w-full rounded-full opacity-75",
+                    micPermission === "denied" 
+                      ? "bg-destructive" 
+                      : isVoiceListening 
+                        ? "bg-primary" 
+                        : "bg-muted-foreground/30"
+                  )} />
+                  <span className={cn(
+                    "relative inline-flex rounded-full h-2 w-2",
+                    micPermission === "denied" 
+                      ? "bg-destructive" 
+                      : isVoiceListening 
+                        ? "bg-primary" 
+                        : "bg-muted-foreground"
+                  )} />
+                </span>
+                <span className="text-xs font-bold uppercase tracking-wider text-foreground">
+                  Voice Command System
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                {micPermission === "denied"
+                  ? "Microphone access is required to listen for emergency calls."
+                  : micPermission === "prompt"
+                    ? "Activate hands-free safety command detection."
+                    : isVoiceListening
+                      ? "Continuously monitoring for critical emergency phrases."
+                      : "Voice trigger is currently in standby mode."}
+              </p>
+            </div>
+            
+            <div className={cn(
+              "h-8 w-8 rounded-lg flex items-center justify-center border transition-all duration-300",
               micPermission === "denied" 
-                ? "bg-destructive" 
+                ? "bg-destructive/10 border-destructive/20 text-destructive" 
                 : isVoiceListening 
-                  ? "bg-primary" 
-                  : "bg-muted-foreground"
+                  ? "bg-primary/15 border-primary/30 text-primary animate-pulse" 
+                  : "bg-secondary border-border text-muted-foreground"
+            )}>
+              <Mic className="h-4 w-4" />
+            </div>
+          </div>
+
+          {/* Real-time Waveform Visualizer */}
+          <div className="bg-secondary/40 backdrop-blur-sm rounded-lg p-2.5 mb-2.5 flex items-center justify-between min-h-[3.5rem]">
+            {micPermission === "denied" ? (
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                className="w-full text-[10px] font-semibold h-7"
+                onClick={onRequestMicPermission}
+              >
+                Grant Microphone Permission
+              </Button>
+            ) : micPermission === "prompt" ? (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full border-primary/30 text-primary hover:bg-primary/5 text-[10px] font-semibold h-7"
+                onClick={onRequestMicPermission}
+              >
+                Enable Listening Mode
+              </Button>
+            ) : isVoiceListening ? (
+              <div className="flex items-center justify-between w-full">
+                {/* Voice Prompts Scroll Banner or list */}
+                <div className="flex flex-col text-left">
+                  <span className="text-[9px] uppercase tracking-wider text-primary font-bold">Heard phrases:</span>
+                  <span className="text-[11px] font-medium text-foreground max-w-[180px] truncate">
+                    "Help me" • "Call ambulance" • "Emergency"
+                  </span>
+                </div>
+                
+                {/* Waveform graphic */}
+                <div className="flex items-center gap-[3px] h-8 px-2">
+                  {[0.3, 0.6, 0.9, 0.7, 0.4, 0.8, 0.5, 0.3].map((factor, idx) => {
+                    const height = Math.max(4, Math.round(audioLevel * 28 * factor));
+                    return (
+                      <motion.div
+                        key={idx}
+                        animate={{ height }}
+                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                        className="w-[3px] rounded-full bg-gradient-to-t from-primary to-rose-500"
+                        style={{ height: 4 }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="text-[10px] text-muted-foreground italic w-full text-center py-1">
+                Listening is paused. Settings screen voice command toggled off?
+              </div>
             )}
-          />
-          <Mic className={cn(
-            "h-3.5 w-3.5",
-            micPermission === "denied" 
-              ? "text-destructive" 
-              : isVoiceListening 
-                ? "text-primary" 
-                : "text-muted-foreground"
-          )} />
-          <span className={cn(
-            "text-[10px] font-medium",
-            micPermission === "denied" 
-              ? "text-destructive" 
-              : isVoiceListening 
-                ? "text-primary" 
-                : "text-muted-foreground"
-          )}>
-            {micPermission === "denied" 
-              ? "Tap to enable microphone for voice commands" 
-              : micPermission === "prompt"
-                ? "Tap to enable voice commands"
-                : isVoiceListening 
-                  ? "Listening for \"Help me\", \"Call ambulance\"..." 
-                  : "Voice detection starting..."}
-          </span>
+          </div>
+
+          {/* Quick Voice Command Prompts Banner */}
+          {micPermission === "granted" && (
+            <div className="flex flex-col gap-1.5 border-t border-border/40 pt-2">
+              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+                Emergency Triggers Prompt:
+              </span>
+              <div className="flex flex-wrap gap-1">
+                <span className="text-[9px] bg-secondary/80 text-foreground px-2 py-0.5 rounded-full border border-border/30">
+                  "Help me"
+                </span>
+                <span className="text-[9px] bg-secondary/80 text-foreground px-2 py-0.5 rounded-full border border-border/30">
+                  "Call ambulance"
+                </span>
+                <span className="text-[9px] bg-secondary/80 text-foreground px-2 py-0.5 rounded-full border border-border/30">
+                  "RoadSOS activate"
+                </span>
+                <span className="text-[9px] bg-secondary/80 text-foreground px-2 py-0.5 rounded-full border border-border/30">
+                  "Emergency"
+                </span>
+                <span className="text-[9px] bg-secondary/80 text-foreground px-2 py-0.5 rounded-full border border-border/30">
+                  "Save me"
+                </span>
+                <span className="text-[9px] bg-destructive/10 text-destructive px-2 py-0.5 rounded-full border border-destructive/20 font-medium animate-pulse">
+                  Loud Scream 🔊
+                </span>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 

@@ -29,6 +29,20 @@ import { Button } from "@/components/ui/button"
 import { useEmergencySMS, saveLastKnownLocation, getLastKnownLocation } from "@/hooks/use-emergency-sms"
 import { useSOSEffects } from "@/hooks/use-sos-effects"
 
+const speak = (text: string) => {
+  if (typeof window !== "undefined" && window.speechSynthesis) {
+    try {
+      window.speechSynthesis.cancel()
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.rate = 1.0
+      utterance.pitch = 1.0
+      window.speechSynthesis.speak(utterance)
+    } catch (e) {
+      console.warn("TTS Speech Synthesis failed:", e)
+    }
+  }
+}
+
 interface EmergencyNumbers {
   police: string
   ambulance: string
@@ -182,6 +196,15 @@ export function SOSFlow({
     }
   }, [isActive])
 
+  // Cancel any speech synthesis on component unmount
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel()
+      }
+    }
+  }, [])
+
   // Timer to unlock details card 5 seconds after entering active phase
   useEffect(() => {
     if (step === "active" && !detailsUnlocked) {
@@ -233,6 +256,9 @@ export function SOSFlow({
       hasSentInitialSmsRef.current = false
       resetSmsRef.current()
       stopEffects() // Stop sounds and vibration
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel()
+      }
       return
     }
 
@@ -265,6 +291,19 @@ export function SOSFlow({
       }
       
       setStep("active")
+      speak("Emergency mode activated. Sharing live location and alerting emergency contacts.")
+      
+      // Log activation status to backend
+      fetch("/api/voice-sos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          triggerType: "voice",
+          sosStatus: "active",
+          location: location ? { lat: location.lat, lng: location.lng, address } : null
+        })
+      }).catch(err => console.warn("Failed to log voice event activation:", err))
+      
       onComplete()
     }
     

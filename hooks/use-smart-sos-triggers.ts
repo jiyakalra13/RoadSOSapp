@@ -48,6 +48,7 @@ interface SmartSOSTriggersResult {
   startVoiceListening: () => void
   stopVoiceListening: () => void
   lastDetectedCommand: string | null
+  audioLevel: number
   isSupported: {
     voice: boolean
     volume: boolean
@@ -104,6 +105,7 @@ export function useSmartSOSTriggers({
   const [settings, setSettings] = useState<SmartTriggerSettings>(defaultSettings)
   const [isVoiceListening, setIsVoiceListening] = useState(false)
   const [lastDetectedCommand, setLastDetectedCommand] = useState<string | null>(null)
+  const [audioLevel, setAudioLevel] = useState<number>(0)
   const [micPermission, setMicPermission] = useState<"prompt" | "granted" | "denied">("prompt")
   const [isSupported, setIsSupported] = useState({
     voice: false,
@@ -116,6 +118,11 @@ export function useSmartSOSTriggers({
   const volumePressTimesRef = useRef<number[]>([])
   const isResettingVolumeRef = useRef(false)
   const onTriggerRef = useRef(onTrigger)
+
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const microphoneStreamRef = useRef<MediaStream | null>(null)
+  const animationFrameIdRef = useRef<number | null>(null)
 
   // Track if voice recognition should be running
   const shouldListenRef = useRef(false)
@@ -200,6 +207,98 @@ export function useSmartSOSTriggers({
     }
   }, [])
 
+  const startScreamDetection = useCallback(async () => {
+    if (microphoneStreamRef.current || audioContextRef.current) return
+
+    try {
+      console.log("[v0] Initializing scream detection Web Audio context...")
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      microphoneStreamRef.current = stream
+
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+      if (!AudioContextClass) return
+
+      const audioContext = new AudioContextClass()
+      audioContextRef.current = audioContext
+
+      const source = audioContext.createMediaStreamSource(stream)
+      const analyser = audioContext.createAnalyser()
+      analyser.fftSize = 256
+      analyserRef.current = analyser
+
+      source.connect(analyser)
+
+      const bufferLength = analyser.frequencyBinCount
+      const dataArray = new Uint8Array(bufferLength)
+
+      let screamTicks = 0
+      const SCREAM_THRESHOLD = 0.38
+      const REQUIRED_SCREAM_TICKS = 4
+
+      const checkVolume = () => {
+        if (!analyserRef.current) return
+
+        analyserRef.current.getByteTimeDomainData(dataArray)
+
+        let sum = 0
+        for (let i = 0; i < bufferLength; i++) {
+          const deviation = (dataArray[i] - 128) / 128
+          sum += deviation * deviation
+        }
+        const rms = Math.sqrt(sum / bufferLength)
+        
+        setAudioLevel(Math.min(rms * 2.5, 1.0))
+
+        if (rms > SCREAM_THRESHOLD) {
+          screamTicks++
+          if (screamTicks >= REQUIRED_SCREAM_TICKS) {
+            console.log("[v0] SCREAM DETECTED! Volume RMS:", rms)
+            screamTicks = 0
+            
+            onTriggerRef.current("voice", "Loud Scream Detected")
+            
+            fetch("/api/voice-sos", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                triggerType: "scream",
+                sosStatus: "triggered",
+                location: null
+              })
+            }).catch(err => console.warn("Failed to log scream event:", err))
+          }
+        } else {
+          screamTicks = Math.max(0, screamTicks - 1)
+        }
+
+        animationFrameIdRef.current = requestAnimationFrame(checkVolume)
+      }
+
+      checkVolume()
+    } catch (err) {
+      console.warn("Failed to start scream detection AudioContext:", err)
+    }
+  }, [])
+
+  const stopScreamDetection = useCallback(() => {
+    if (animationFrameIdRef.current) {
+      cancelAnimationFrame(animationFrameIdRef.current)
+      animationFrameIdRef.current = null
+    }
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close()
+      } catch {}
+      audioContextRef.current = null
+    }
+    if (microphoneStreamRef.current) {
+      microphoneStreamRef.current.getTracks().forEach(track => track.stop())
+      microphoneStreamRef.current = null
+    }
+    analyserRef.current = null
+    setAudioLevel(0)
+  }, [])
+
   // Initialize voice recognition for SOS commands - auto-starts when enabled
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -221,6 +320,7 @@ export function useSmartSOSTriggers({
       console.log("[v0] Voice recognition started - listening for commands")
       setIsVoiceListening(true)
       consecutiveErrorsRef.current = 0 // Reset error counter on successful start
+      startScreamDetection()
     }
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -235,6 +335,17 @@ export function useSmartSOSTriggers({
           shouldListenRef.current = false
           onTriggerRef.current("voice", transcript)
           recognition.stop()
+
+          fetch("/api/voice-sos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              triggerType: "voice",
+              sosStatus: "triggered",
+              location: null
+            })
+          }).catch(err => console.warn("Failed to log voice event:", err))
+          
           return
         }
       }
@@ -260,6 +371,7 @@ export function useSmartSOSTriggers({
     recognition.onend = () => {
       console.log("[v0] Voice recognition ended, shouldListen:", shouldListenRef.current)
       setIsVoiceListening(false)
+      stopScreamDetection()
       // Clear any existing restart timeout
       if (restartTimeoutRef.current) {
         clearTimeout(restartTimeoutRef.current)
@@ -314,6 +426,7 @@ export function useSmartSOSTriggers({
       }
       recognition.abort()
       recognitionRef.current = null
+      stopScreamDetection()
     }
   }, [settings.voiceCommandEnabled, enabled, checkForSOSCommand, requestMicrophonePermission])
 
@@ -471,6 +584,7 @@ export function useSmartSOSTriggers({
     startVoiceListening,
     stopVoiceListening,
     lastDetectedCommand,
+    audioLevel,
     isSupported,
     micPermission,
     requestMicrophonePermission

@@ -2,9 +2,23 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { AlertTriangle, X, Mic, Car, Phone, User, Heart, Pill, AlertCircle, ChevronDown } from "lucide-react"
+import { AlertTriangle, X, Mic, Car, Phone, User, Heart, Pill, AlertCircle, ChevronDown, Ambulance } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useSOSEffects } from "@/hooks/use-sos-effects"
+
+const speak = (text: string) => {
+  if (typeof window !== "undefined" && window.speechSynthesis) {
+    try {
+      window.speechSynthesis.cancel()
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.rate = 1.0
+      utterance.pitch = 1.0
+      window.speechSynthesis.speak(utterance)
+    } catch (e) {
+      console.warn("TTS Speech Synthesis failed:", e)
+    }
+  }
+}
 
 interface SOSConfirmationOverlayProps {
   isVisible: boolean
@@ -61,10 +75,30 @@ export function SOSConfirmationOverlay({
       setCountdown(getCountdownTime())
       setShowDetails(false)
       hasCalledRef.current = false
+
+      if (triggerType === "voice") {
+        speak("Emergency detected. Activating S O S. Cancel if safe.")
+      } else if (triggerType === "crash") {
+        speak("Possible crash detected. Activating S O S automatically in ten seconds unless canceled.")
+      } else if (triggerType === "volume") {
+        speak("Emergency S O S triggered. Starting soon.")
+      }
     } else {
       stopEffects()
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel()
+      }
     }
-  }, [isVisible, getCountdownTime, stopEffects])
+  }, [isVisible, triggerType, getCountdownTime, stopEffects])
+
+  // Cancel any speech synthesis on component unmount
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel()
+      }
+    }
+  }, [])
 
   // Wake Lock - Keep screen on during confirmation overlay
   useEffect(() => {

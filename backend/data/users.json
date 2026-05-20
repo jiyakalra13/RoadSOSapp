@@ -1,0 +1,27 @@
+[
+  {
+    "fullName": "Jane Doe",
+    "phone": "9876543210",
+    "countryCode": "IN",
+    "dateOfBirth": "1995-05-15",
+    "gender": "Female",
+    "bloodGroup": "O+",
+    "allergies": "Nuts",
+    "medicalConditions": "None",
+    "medications": "None",
+    "emergencyContacts": [
+      {
+        "id": "contact-1",
+        "name": "Emergency Contact 1",
+        "phone": "9999988888",
+        "relationship": "Brother"
+      }
+    ],
+    "vehicleNumber": "MH-12-AB-1234",
+    "vehicleModel": "Sedan",
+    "hasCompletedOnboarding": true,
+    "createdAt": "2026-05-20T06:57:00.354881Z",
+    "updatedAt": "2026-05-20T06:57:00.354881Z",
+    "id": "user-1779260220354"
+  }
+]

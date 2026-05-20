@@ -114,7 +114,14 @@ export default function RoadSOSApp() {
   }, [sosActive, callAmbulance, getEmergencyNumbers])
 
   // Smart SOS triggers (voice commands, volume button, crash detection)
-  const { lastDetectedCommand, isVoiceListening, settings: smartTriggerSettings, micPermission, requestMicrophonePermission } = useSmartSOSTriggers({
+  const { 
+    lastDetectedCommand, 
+    isVoiceListening, 
+    settings: smartTriggerSettings, 
+    micPermission, 
+    requestMicrophonePermission,
+    audioLevel
+  } = useSmartSOSTriggers({
     onTrigger: handleSmartTrigger,
     enabled: !sosActive // Disable triggers when SOS is already active
   })
@@ -211,6 +218,7 @@ export default function RoadSOSApp() {
             voiceEnabled={smartTriggerSettings.voiceCommandEnabled}
             micPermission={micPermission}
             onRequestMicPermission={requestMicrophonePermission}
+            audioLevel={audioLevel}
             userGender={profile?.gender}
           />
         )

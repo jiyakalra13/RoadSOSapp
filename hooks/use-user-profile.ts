@@ -63,21 +63,41 @@ export function useUserProfile() {
   const [isLoading, setIsLoading] = useState(true)
   const [country, setCountry] = useState<Country | undefined>(undefined)
 
-  // Load profile from localStorage
+  // Load profile from localStorage & sync with Python Backend
   useEffect(() => {
+    let hasLocal = false
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
         const parsed = JSON.parse(stored) as UserProfile
         setProfile(parsed)
         setCountry(getCountryByCode(parsed.countryCode))
-      } else {
-        setProfile(null)
+        hasLocal = true
       }
     } catch {
-      setProfile(null)
+      // Ignore local storage error
     }
-    setIsLoading(false)
+
+    // Try to sync with Python Backend
+    fetch('/api/user/profile')
+      .then(res => {
+        if (!res.ok) throw new Error("No backend profile")
+        return res.json()
+      })
+      .then((backendProfile: UserProfile) => {
+        if (backendProfile && backendProfile.phone) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(backendProfile))
+          setProfile(backendProfile)
+          setCountry(getCountryByCode(backendProfile.countryCode))
+          console.log("Successfully synced profile from Python backend!");
+        }
+      })
+      .catch(err => {
+        console.log("Python backend offline or empty, fell back to local storage.", err)
+      })
+      .finally(() => {
+        setIsLoading(false)
+      })
   }, [])
 
   // Save profile to localStorage and Backend
