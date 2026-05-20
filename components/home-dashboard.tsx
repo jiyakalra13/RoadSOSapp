@@ -37,6 +37,7 @@ interface HomeDashboardProps {
   voiceEnabled?: boolean
   micPermission?: "prompt" | "granted" | "denied"
   onRequestMicPermission?: () => void
+  startVoiceListening?: () => void
   audioLevel?: number
   userGender?: string
 }
@@ -92,6 +93,7 @@ export function HomeDashboard({
   voiceEnabled,
   micPermission,
   onRequestMicPermission,
+  startVoiceListening = () => {},
   audioLevel = 0,
   userGender
 }: HomeDashboardProps) {
@@ -521,16 +523,27 @@ export function HomeDashboard({
               </p>
             </div>
             
-            <div className={cn(
-              "h-8 w-8 rounded-lg flex items-center justify-center border transition-all duration-300",
-              micPermission === "denied" 
-                ? "bg-destructive/10 border-destructive/20 text-destructive" 
-                : isVoiceListening 
-                  ? "bg-primary/15 border-primary/30 text-primary animate-pulse" 
-                  : "bg-secondary border-border text-muted-foreground"
-            )}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                if (micPermission !== "granted") {
+                  onRequestMicPermission?.()
+                } else {
+                  startVoiceListening()
+                }
+              }}
+              className={cn(
+                "h-8 w-8 rounded-lg flex items-center justify-center border transition-all duration-300",
+                micPermission === "denied" 
+                  ? "bg-destructive/10 border-destructive/20 text-destructive hover:bg-destructive/25" 
+                  : isVoiceListening 
+                    ? "bg-primary/15 border-primary/30 text-primary animate-pulse hover:bg-primary/25" 
+                    : "bg-secondary border-border text-muted-foreground hover:bg-secondary/80"
+              )}
+            >
               <Mic className="h-4 w-4" />
-            </div>
+            </Button>
           </div>
 
           {/* Live speech transcription in the gap area - ALWAYS VISIBLE */}

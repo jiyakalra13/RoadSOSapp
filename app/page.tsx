@@ -118,6 +118,7 @@ export default function RoadSOSApp() {
     lastDetectedCommand, 
     isVoiceListening, 
     spokenText,
+    startVoiceListening,
     settings: smartTriggerSettings, 
     micPermission, 
     requestMicrophonePermission,
@@ -220,6 +221,7 @@ export default function RoadSOSApp() {
             voiceEnabled={smartTriggerSettings.voiceCommandEnabled}
             micPermission={micPermission}
             onRequestMicPermission={requestMicrophonePermission}
+            startVoiceListening={startVoiceListening}
             audioLevel={audioLevel}
             userGender={profile?.gender}
           />
