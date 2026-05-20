@@ -287,7 +287,7 @@ export function SOSFlow({
     }
   }, [isActive, step, triggerType])
 
-  // Automatic Emergency Calls Trigger (Ambulance followed by Primary Emergency Contact)
+  // Automatic Emergency Calls Trigger (Ambulance followed by Local Emergency Services of that area)
   useEffect(() => {
     if (!isActive || step !== "active") return
 
@@ -301,15 +301,15 @@ export function SOSFlow({
         }, 1000)
       } else if (
         hasCalledAmbulanceRef.current &&
-        !hasCalledContactRef.current &&
-        emergencyContacts.length > 0 &&
-        emergencyContacts[0].phone
+        !hasCalledContactRef.current
       ) {
         hasCalledContactRef.current = true
+        const localEmergencyService = emergencyNumbers.police || emergencyNumbers.general || "112"
+        const serviceLabel = localEmergencyService === "100" || localEmergencyService === "911" ? "police" : "emergency services"
         // Speak notification before dialing
-        speak(`Calling emergency contact, ${emergencyContacts[0].name.split(" ")[0]}, now.`)
+        speak(`Calling area ${serviceLabel} now.`)
         setTimeout(() => {
-          callPhone(emergencyContacts[0].phone)
+          callPhone(localEmergencyService)
         }, 1000)
       }
     }
@@ -331,7 +331,7 @@ export function SOSFlow({
       document.removeEventListener("visibilitychange", handleVisibilityChange)
       window.removeEventListener("focus", handleAutoCalls)
     }
-  }, [isActive, step, emergencyNumbers.ambulance, emergencyContacts])
+  }, [isActive, step, emergencyNumbers.ambulance, emergencyNumbers.police, emergencyNumbers.general])
 
   // Handle the sending sequence separately
   useEffect(() => {
