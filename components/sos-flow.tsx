@@ -256,22 +256,14 @@ export function SOSFlow({
     if (!isActive || step !== "sending") return
 
     const sequence = async () => {
-      setStepStatus((s) => ({ ...s, detecting: "loading" }))
-      await new Promise((r) => setTimeout(r, 800))
-      setStepStatus((s) => ({ ...s, detecting: "complete", sharing: "loading" }))
+      setStepStatus({ detecting: "complete", sharing: "complete", alerting: "complete" })
       
       // SMS will now be triggered manually by the user via a button on the active SOS screen.
       // We skip the automatic background sending.
       if (emergencyContacts.length > 0) {
-        // Just advance the UI state for the animations
         setSmsSent(false)
       }
       
-      await new Promise((r) => setTimeout(r, 1000))
-      setStepStatus((s) => ({ ...s, sharing: "complete", alerting: "loading" }))
-      await new Promise((r) => setTimeout(r, 800))
-      setStepStatus((s) => ({ ...s, alerting: "complete" }))
-      await new Promise((r) => setTimeout(r, 400))
       setStep("active")
       onComplete()
     }
