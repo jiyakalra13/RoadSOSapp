@@ -66,6 +66,9 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
     const updated = { ...smartTriggers, [key]: value }
     setSmartTriggers(updated)
     saveSmartTriggerSettings(updated)
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("roadsos_settings_updated"))
+    }
   }
 
   const handleGeneralSettingChange = (key: keyof GeneralSettings, value: boolean) => {

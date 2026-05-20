@@ -103,7 +103,9 @@ export function useSmartSOSTriggers({
   enabled = true
 }: UseSmartSOSTriggersOptions): SmartSOSTriggersResult {
   const [settings, setSettings] = useState<SmartTriggerSettings>(defaultSettings)
-  const [isVoiceListening, setIsVoiceListening] = useState(false)
+  const [isAudioListening, setIsAudioListening] = useState(false)
+  const [isSpeechListening, setIsSpeechListening] = useState(false)
+  const isVoiceListening = isAudioListening || isSpeechListening
   const [lastDetectedCommand, setLastDetectedCommand] = useState<string | null>(null)
   const [audioLevel, setAudioLevel] = useState<number>(0)
   const [micPermission, setMicPermission] = useState<"prompt" | "granted" | "denied">("prompt")
@@ -136,15 +138,40 @@ export function useSmartSOSTriggers({
     onTriggerRef.current = onTrigger
   }, [onTrigger])
 
-  // Load settings from localStorage
+  // Load settings from localStorage and listen to updates
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(SMART_TRIGGERS_STORAGE_KEY)
-      if (stored) {
-        setSettings(JSON.parse(stored))
+    const load = () => {
+      try {
+        const stored = localStorage.getItem(SMART_TRIGGERS_STORAGE_KEY)
+        if (stored) {
+          setSettings(JSON.parse(stored))
+        }
+      } catch {
+        // Use defaults
       }
-    } catch {
-      // Use defaults
+    }
+    load()
+
+    // Detect if microphone permission has already been granted (useful on iOS Safari)
+    const checkInitialPermission = async () => {
+      if (typeof navigator === "undefined" || !navigator.mediaDevices) return
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const hasLabel = devices.some(d => d.kind === "audioinput" && d.label !== "")
+        if (hasLabel) {
+          setMicPermission("granted")
+        }
+      } catch (e) {
+        console.log("[v0] Error checking device labels:", e)
+      }
+    }
+    checkInitialPermission()
+
+    window.addEventListener("roadsos_settings_updated", load)
+    window.addEventListener("storage", load)
+    return () => {
+      window.removeEventListener("roadsos_settings_updated", load)
+      window.removeEventListener("storage", load)
     }
   }, [])
 
@@ -214,6 +241,7 @@ export function useSmartSOSTriggers({
       console.log("[v0] Initializing scream detection Web Audio context...")
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       microphoneStreamRef.current = stream
+      setIsAudioListening(true)
 
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
       if (!AudioContextClass) return
@@ -277,6 +305,7 @@ export function useSmartSOSTriggers({
       checkVolume()
     } catch (err) {
       console.warn("Failed to start scream detection AudioContext:", err)
+      setIsAudioListening(false)
     }
   }, [])
 
@@ -297,18 +326,38 @@ export function useSmartSOSTriggers({
     }
     analyserRef.current = null
     setAudioLevel(0)
+    setIsAudioListening(false)
   }, [])
 
-  // Initialize voice recognition for SOS commands - auto-starts when enabled
+  // Scream detection lifecycle: auto-start when mic permission is granted and feature is enabled
   useEffect(() => {
     if (typeof window === "undefined") return
-    if (!settings.voiceCommandEnabled || !enabled) {
+    if (!settings.voiceCommandEnabled || !enabled || micPermission !== "granted") {
+      stopScreamDetection()
+      return
+    }
+
+    startScreamDetection()
+
+    return () => {
+      stopScreamDetection()
+    }
+  }, [settings.voiceCommandEnabled, enabled, micPermission, startScreamDetection, stopScreamDetection])
+
+  // Initialize voice recognition for SOS commands - auto-starts when enabled and permission granted
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (!settings.voiceCommandEnabled || !enabled || micPermission !== "granted") {
       shouldListenRef.current = false
+      setIsSpeechListening(false)
       return
     }
 
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SpeechRecognitionAPI) return
+    if (!SpeechRecognitionAPI) {
+      console.log("[v0] Speech recognition API not supported in this browser.")
+      return
+    }
 
     shouldListenRef.current = true
     const recognition = new SpeechRecognitionAPI()
@@ -318,9 +367,8 @@ export function useSmartSOSTriggers({
 
     recognition.onstart = () => {
       console.log("[v0] Voice recognition started - listening for commands")
-      setIsVoiceListening(true)
+      setIsSpeechListening(true)
       consecutiveErrorsRef.current = 0 // Reset error counter on successful start
-      startScreamDetection()
     }
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -355,14 +403,12 @@ export function useSmartSOSTriggers({
       console.log("[v0] Voice recognition error:", event.error)
       consecutiveErrorsRef.current++
       
-      // Don't set listening to false on no-speech errors, just restart
       if (event.error !== "no-speech" && event.error !== "aborted") {
-        setIsVoiceListening(false)
+        setIsSpeechListening(false)
       }
       
-      // If permission denied or too many errors, stop trying to restart
       if (event.error === "not-allowed") {
-        shouldListenRef.current = false // Stop restart loop
+        shouldListenRef.current = false
         setMicPermission("denied")
         console.log("[v0] Microphone permission denied - stopping voice recognition")
       }
@@ -370,13 +416,12 @@ export function useSmartSOSTriggers({
 
     recognition.onend = () => {
       console.log("[v0] Voice recognition ended, shouldListen:", shouldListenRef.current)
-      setIsVoiceListening(false)
-      stopScreamDetection()
-      // Clear any existing restart timeout
+      setIsSpeechListening(false)
+      
       if (restartTimeoutRef.current) {
         clearTimeout(restartTimeoutRef.current)
       }
-      // Auto-restart if still enabled, should be listening, and haven't hit error limit
+      
       if (shouldListenRef.current && settings.voiceCommandEnabled && enabled && consecutiveErrorsRef.current < maxConsecutiveErrors) {
         restartTimeoutRef.current = setTimeout(() => {
           try {
@@ -385,29 +430,18 @@ export function useSmartSOSTriggers({
           } catch (e) {
             console.log("[v0] Restart error:", e)
             consecutiveErrorsRef.current++
-            // Stop trying if we've hit the error limit
             if (consecutiveErrorsRef.current >= maxConsecutiveErrors) {
               console.log("[v0] Too many consecutive errors, stopping voice recognition")
               shouldListenRef.current = false
             }
           }
         }, 300)
-      } else if (consecutiveErrorsRef.current >= maxConsecutiveErrors) {
-        console.log("[v0] Stopping voice recognition due to repeated errors")
       }
     }
 
     recognitionRef.current = recognition
 
-    // Auto-start voice recognition only if we have permission or haven't been denied
-    const startRecognition = async () => {
-      // Don't start if permission was already denied
-      if (micPermission === "denied") {
-        console.log("[v0] Skipping voice recognition - microphone permission denied")
-        shouldListenRef.current = false
-        return
-      }
-      
+    const startRecognition = () => {
       try {
         console.log("[v0] Starting voice recognition...")
         recognition.start()
@@ -424,9 +458,11 @@ export function useSmartSOSTriggers({
       if (restartTimeoutRef.current) {
         clearTimeout(restartTimeoutRef.current)
       }
-      recognition.abort()
+      try {
+        recognition.abort()
+      } catch {}
       recognitionRef.current = null
-      stopScreamDetection()
+      setIsSpeechListening(false)
     }
   }, [settings.voiceCommandEnabled, enabled, checkForSOSCommand, requestMicrophonePermission])
 
