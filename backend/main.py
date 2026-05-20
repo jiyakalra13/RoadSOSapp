@@ -43,6 +43,7 @@ DATA_DIR = Path(__file__).resolve().parent / "data"
 USERS_FILE = DATA_DIR / "users.json"
 ALERTS_FILE = DATA_DIR / "alerts.json"
 VOICE_ALERTS_FILE = DATA_DIR / "voice_alerts.json"
+DANGER_LOGS_FILE = DATA_DIR / "danger_logs.json"
 
 def ensure_data_dir():
     """Ensure data files and directory exist."""
@@ -56,6 +57,22 @@ def ensure_data_dir():
     if not VOICE_ALERTS_FILE.exists():
         with open(VOICE_ALERTS_FILE, "w", encoding="utf-8") as f:
             json.dump([], f)
+    if not DANGER_LOGS_FILE.exists():
+        with open(DANGER_LOGS_FILE, "w", encoding="utf-8") as f:
+            json.dump([], f)
+
+def read_danger_logs() -> list:
+    ensure_data_dir()
+    try:
+        with open(DANGER_LOGS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def write_danger_logs(logs: list):
+    ensure_data_dir()
+    with open(DANGER_LOGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(logs, f, indent=2, ensure_ascii=False)
 
 def read_users() -> list:
     ensure_data_dir()
@@ -315,6 +332,139 @@ def log_voice_sos(payload: VoiceSOSPayload):
 def get_voice_sos_history():
     """Retrieve historical logs of voice/scream SOS events."""
     return read_voice_alerts()
+
+# --- Accident-Prone Area Safety API Endpoints ---
+class DangerCheckPayload(BaseModel):
+    lat: float
+    lng: float
+
+DANGER_ZONES = [
+  {
+    "id": "zone-1",
+    "name": "NH-8 Intersection Junction",
+    "lat": 28.6139,
+    "lng": 77.2090,
+    "radius": 300,
+    "riskLevel": "high",
+    "confidence": 0.92,
+    "trafficDensity": "high",
+    "poorLighting": True,
+    "description": "Frequent multi-vehicle pileups due to abrupt merge lanes and poor illumination at night."
+  },
+  {
+    "id": "zone-2",
+    "name": "Western Express Curve",
+    "lat": 19.0760,
+    "lng": 72.8777,
+    "radius": 250,
+    "riskLevel": "high",
+    "confidence": 0.88,
+    "trafficDensity": "high",
+    "poorLighting": False,
+    "description": "Sharp blind turn with high speed limits, prone to skidding during rain."
+  },
+  {
+    "id": "zone-3",
+    "name": "Outer Ring Road Blind Corner",
+    "lat": 12.9716,
+    "lng": 77.5946,
+    "radius": 200,
+    "riskLevel": "high",
+    "confidence": 0.85,
+    "trafficDensity": "moderate",
+    "poorLighting": True,
+    "description": "Narrow curve with construction zones and blocked visibility."
+  },
+  {
+    "id": "zone-4",
+    "name": "Sector 62 Crossing",
+    "lat": 28.6273,
+    "lng": 77.3725,
+    "radius": 300,
+    "riskLevel": "high",
+    "confidence": 0.89,
+    "trafficDensity": "high",
+    "poorLighting": False,
+    "description": "Heavy commercial traffic and lack of clear lane markings."
+  },
+  {
+    "id": "zone-5",
+    "name": "Mock Simulator Danger Zone",
+    "lat": 0.0,
+    "lng": 0.0,
+    "radius": 1000,
+    "riskLevel": "high",
+    "confidence": 0.95,
+    "trafficDensity": "low",
+    "poorLighting": True,
+    "description": "Default mock location for development environment testing."
+  }
+]
+
+def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    import math
+    R = 6371000.0 # Earth radius in meters
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+    a = (math.sin(delta_phi / 2.0) ** 2 +
+         math.cos(phi1) * math.cos(phi2) * (math.sin(delta_lambda / 2.0) ** 2))
+    c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+    return R * c
+
+@app.get("/api/danger/zones")
+def get_danger_zones():
+    """Retrieve predefined danger zones."""
+    return {"success": True, "zones": DANGER_ZONES}
+
+@app.post("/api/danger/check")
+def check_danger_location(payload: DangerCheckPayload):
+    """Check coordinates and log check results."""
+    lat = payload.lat
+    lng = payload.lng
+    
+    detected_zone = None
+    min_distance = float('inf')
+    
+    for zone in DANGER_ZONES:
+        dist = calculate_distance(lat, lng, zone["lat"], zone["lng"])
+        if dist <= zone["radius"]:
+            if dist < min_distance:
+                min_distance = dist
+                detected_zone = zone
+                
+    in_danger_zone = detected_zone is not None
+    risk_level = detected_zone["riskLevel"] if in_danger_zone else "low"
+    confidence = detected_zone["confidence"] if in_danger_zone else 0.12
+    zone_name = detected_zone["name"] if in_danger_zone else "Safe Area"
+    
+    log_record = {
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "location": {"lat": lat, "lng": lng},
+        "riskLevel": risk_level,
+        "confidence": confidence,
+        "zoneName": zone_name,
+        "inDangerZone": in_danger_zone,
+        "distanceToZone": round(min_distance) if in_danger_zone else None
+    }
+    
+    # Save log
+    logs = read_danger_logs()
+    logs.insert(0, log_record)
+    # Cap at last 500 records
+    if len(logs) > 500:
+        logs = logs[:500]
+    write_danger_logs(logs)
+    
+    return {
+        "success": True,
+        "inDangerZone": in_danger_zone,
+        "riskLevel": risk_level,
+        "confidence": confidence,
+        "zoneName": zone_name,
+        "log": log_record
+    }
 
 # --- Health Check ---
 @app.get("/health")

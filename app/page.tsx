@@ -20,6 +20,7 @@ import { useLocation } from "@/hooks/use-location"
 import { useUserProfile } from "@/hooks/use-user-profile"
 import { useNetworkStatus } from "@/hooks/use-network-status"
 import { useSmartSOSTriggers } from "@/hooks/use-smart-sos-triggers"
+import { useDangerZones } from "@/hooks/use-danger-zones"
 
 type ActiveView = 
   | "home" 
@@ -131,6 +132,9 @@ export default function RoadSOSApp() {
   // Convert location format for components
   const location = gpsLocation ? { lat: gpsLocation.lat, lng: gpsLocation.lng } : null
 
+  // Danger zones check hook
+  const { activeWarning } = useDangerZones(location, activeView === "home" && !sosActive)
+
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
     setActiveView(tab as ActiveView)
@@ -224,6 +228,7 @@ export default function RoadSOSApp() {
             startVoiceListening={startVoiceListening}
             audioLevel={audioLevel}
             userGender={profile?.gender}
+            activeWarning={activeWarning}
           />
         )
       case "services":

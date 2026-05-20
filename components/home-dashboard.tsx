@@ -38,6 +38,12 @@ interface HomeDashboardProps {
   startVoiceListening?: () => void
   audioLevel?: number
   userGender?: string
+  activeWarning?: {
+    inDangerZone: boolean
+    riskLevel: "high" | "medium" | "low"
+    confidence: number
+    zoneName: string
+  } | null
 }
 
 const services = [
@@ -93,7 +99,8 @@ export function HomeDashboard({
   onRequestMicPermission,
   startVoiceListening = () => {},
   audioLevel = 0,
-  userGender
+  userGender,
+  activeWarning = null
 }: HomeDashboardProps) {
   const [sosPressed, setSosPressed] = useState(false)
   const [pressTimer, setPressTimer] = useState<NodeJS.Timeout | null>(null)
@@ -134,7 +141,46 @@ export function HomeDashboard({
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7.5rem)] px-4 py-3 overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-7.5rem)] px-4 py-3 overflow-hidden relative">
+      {/* Floating Danger Alert Banner */}
+      <AnimatePresence>
+        {activeWarning && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 350, damping: 25 }}
+            className="absolute top-4 left-4 right-4 z-50 pointer-events-none"
+          >
+            <div className="bg-destructive/95 backdrop-blur-lg border border-warning/50 text-white rounded-xl p-4 shadow-[0_0_25px_rgba(239,68,68,0.4)] flex items-start gap-3 pointer-events-auto relative overflow-hidden animate-pulse">
+              {/* Warning Glow Effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 via-yellow-500/20 to-red-500/20 mix-blend-overlay animate-[spin_4s_linear_infinite]" />
+              
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 text-yellow-300 animate-bounce">
+                <AlertTriangle className="h-5 w-5 fill-current" />
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-bold text-white tracking-wide uppercase">
+                  ⚠️ Accident-Prone Area Ahead
+                </h4>
+                <p className="text-xs text-white/90 font-medium mt-0.5">
+                  Please stay alert and drive carefully.
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-[9px] bg-yellow-500/30 border border-yellow-400/40 text-yellow-200 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                    {activeWarning.zoneName}
+                  </span>
+                  <span className="text-[9px] bg-red-500/30 border border-red-400/40 text-red-200 px-2 py-0.5 rounded-full font-bold">
+                    Risk Score: {Math.round(activeWarning.confidence * 100)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-2 shrink-0">
         <div>
@@ -144,7 +190,12 @@ export function HomeDashboard({
       </div>
 
       {/* Location Status */}
-      <Card className="p-3 mb-3 bg-card/85 backdrop-blur-md border-border/50 shrink-0">
+      <Card className={cn(
+        "p-3 mb-3 bg-card/85 backdrop-blur-md shrink-0 transition-all duration-300",
+        activeWarning 
+          ? "border-destructive shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse" 
+          : "border-border/50"
+      )}>
         <div className="flex items-center gap-3">
           <div className={cn(
             "h-9 w-9 rounded-full flex items-center justify-center",
