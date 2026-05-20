@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Phone, PhoneOff, User } from "lucide-react"
+import { Phone, PhoneOff, User, MicOff, Volume2, Mic, VolumeX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface FakeCallScreenProps {
@@ -16,14 +16,18 @@ type CallState = "waiting" | "ringing" | "answered"
 export function FakeCallScreen({ callerName, delaySeconds, onEndCall }: FakeCallScreenProps) {
   const [callState, setCallState] = useState<CallState>("waiting")
   const [callDuration, setCallDuration] = useState(0)
+  const [isMuted, setIsMuted] = useState(false)
+  const [isSpeaker, setIsSpeaker] = useState(false)
+
+  const ringIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const waitTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const audioCtxRef = useRef<any>(null)
 
   // Initialize audio and handle waiting countdown
   useEffect(() => {
     // We create a simple oscillator-based ringtone since we might not have an mp3 file
     const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
-    
-    let ringInterval: NodeJS.Timeout
-    let waitTimeout: NodeJS.Timeout
+    audioCtxRef.current = audioCtx
 
     const playRingTone = () => {
       if (audioCtx.state === 'suspended') {
@@ -57,16 +61,18 @@ export function FakeCallScreen({ callerName, delaySeconds, onEndCall }: FakeCall
       }
     }
 
-    waitTimeout = setTimeout(() => {
+    waitTimeoutRef.current = setTimeout(() => {
       setCallState("ringing")
       playRingTone() // Initial ring
-      ringInterval = setInterval(playRingTone, 3000) // Ring every 3 seconds
+      ringIntervalRef.current = setInterval(playRingTone, 3000) // Ring every 3 seconds
     }, delaySeconds * 1000)
 
     return () => {
-      clearTimeout(waitTimeout)
-      clearInterval(ringInterval)
-      audioCtx.close()
+      if (waitTimeoutRef.current) clearTimeout(waitTimeoutRef.current)
+      if (ringIntervalRef.current) clearInterval(ringIntervalRef.current)
+      if (audioCtxRef.current?.state !== 'closed') {
+        audioCtxRef.current?.close().catch(() => {})
+      }
       if ("vibrate" in navigator) {
         navigator.vibrate(0)
       }
@@ -86,6 +92,11 @@ export function FakeCallScreen({ callerName, delaySeconds, onEndCall }: FakeCall
 
   const handleAccept = () => {
     setCallState("answered")
+    if (ringIntervalRef.current) clearInterval(ringIntervalRef.current)
+    if (waitTimeoutRef.current) clearTimeout(waitTimeoutRef.current)
+    if (audioCtxRef.current?.state !== 'closed') {
+      audioCtxRef.current?.close().catch(() => {})
+    }
     if ("vibrate" in navigator) {
       navigator.vibrate(0) // Stop vibrating
     }
@@ -178,13 +189,29 @@ export function FakeCallScreen({ callerName, delaySeconds, onEndCall }: FakeCall
                   </motion.button>
                 </>
               ) : (
-                <div className="w-full flex justify-center">
+                <div className="w-full flex justify-between px-4">
+                  <motion.button 
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setIsMuted(!isMuted)}
+                    className={`w-16 h-16 rounded-full flex flex-col items-center justify-center transition-colors ${isMuted ? 'bg-white text-slate-900' : 'bg-slate-700 text-white'}`}
+                  >
+                    {isMuted ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
+                  </motion.button>
+
                   <motion.button 
                     whileTap={{ scale: 0.9 }}
                     onClick={handleDecline}
-                    className="w-20 h-20 rounded-full bg-red-500 flex flex-col items-center justify-center text-white shadow-lg shadow-red-500/20"
+                    className="w-20 h-20 rounded-full bg-red-500 flex flex-col items-center justify-center text-white shadow-lg shadow-red-500/20 -translate-y-2"
                   >
                     <PhoneOff className="w-8 h-8 mb-1" />
+                  </motion.button>
+
+                  <motion.button 
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setIsSpeaker(!isSpeaker)}
+                    className={`w-16 h-16 rounded-full flex flex-col items-center justify-center transition-colors ${isSpeaker ? 'bg-white text-slate-900' : 'bg-slate-700 text-white'}`}
+                  >
+                    {isSpeaker ? <Volume2 className="w-7 h-7" /> : <VolumeX className="w-7 h-7" />}
                   </motion.button>
                 </div>
               )}
@@ -197,8 +224,10 @@ export function FakeCallScreen({ callerName, delaySeconds, onEndCall }: FakeCall
               </div>
             )}
             {callState === "answered" && (
-              <div className="w-full flex justify-center mt-4 text-white/80 text-sm">
+              <div className="w-full flex justify-between px-4 mt-4 text-white/80 text-sm">
+                <span className="w-16 text-center">{isMuted ? 'Muted' : 'Mute'}</span>
                 <span className="w-20 text-center">End Call</span>
+                <span className="w-16 text-center">{isSpeaker ? 'Speaker' : 'Speaker'}</span>
               </div>
             )}
           </div>

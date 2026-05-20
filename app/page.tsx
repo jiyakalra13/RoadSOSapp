@@ -310,7 +310,7 @@ export default function RoadSOSApp() {
       </div>
       
       {/* Bottom Navigation */}
-      {!sosActive && (
+      {!sosActive && !activeView.startsWith("fakecall") && (
         <BottomNav 
           activeTab={activeTab} 
           onTabChange={handleTabChange}
