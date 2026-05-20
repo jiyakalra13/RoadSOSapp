@@ -144,7 +144,7 @@ export function HomeDashboard({
       </div>
 
       {/* Location Status */}
-      <Card className="p-3 mb-3 bg-card/50 backdrop-blur border-border/50 shrink-0">
+      <Card className="p-3 mb-3 bg-card/85 backdrop-blur-md border-border/50 shrink-0">
         <div className="flex items-center gap-3">
           <div className={cn(
             "h-9 w-9 rounded-full flex items-center justify-center",
@@ -282,7 +282,7 @@ export function HomeDashboard({
             onClick={() => onServiceSelect("safewalk")}
             className={cn(
               "flex items-center gap-3 p-3 rounded-xl",
-              "bg-card border border-primary/30",
+              "bg-card/85 backdrop-blur-md border border-primary/30",
               "shadow-sm active:shadow-none transition-all duration-200"
             )}
           >
@@ -301,7 +301,7 @@ export function HomeDashboard({
           onClick={() => onServiceSelect("fakecall")}
           className={cn(
             "flex items-center gap-3 p-3 rounded-xl",
-            "bg-card border border-primary/30",
+            "bg-card/85 backdrop-blur-md border border-primary/30",
             "shadow-sm active:shadow-none transition-all duration-200"
           )}
         >
@@ -326,7 +326,7 @@ export function HomeDashboard({
               onClick={() => onServiceSelect(service.id)}
               className={cn(
                 "flex flex-col items-center p-3 rounded-xl",
-                "bg-card border border-border/50",
+                "bg-card/85 backdrop-blur-md border border-border/50",
                 "shadow-sm active:shadow-none transition-all duration-200"
               )}
             >
@@ -352,7 +352,7 @@ export function HomeDashboard({
               ? "bg-destructive/5 border-destructive/20 shadow-destructive/5" 
               : isVoiceListening 
                 ? "bg-primary/5 border-primary/40 shadow-md shadow-primary/5" 
-                : "bg-card border-border/50"
+                : "bg-card/85 backdrop-blur-md border-border/50"
           )}
           onClick={micPermission !== "granted" ? onRequestMicPermission : undefined}
         >
