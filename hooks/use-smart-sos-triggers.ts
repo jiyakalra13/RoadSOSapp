@@ -221,7 +221,30 @@ export function useSmartSOSTriggers({
   // Check if transcript contains SOS command
   const checkForSOSCommand = useCallback((transcript: string): boolean => {
     const normalized = transcript.toLowerCase().trim()
-    return SOS_VOICE_COMMANDS.some(cmd => normalized.includes(cmd))
+    
+    // 1. Check if the transcript contains any of the exact multi-word key phrases
+    const hasPhraseMatch = SOS_VOICE_COMMANDS.some(cmd => normalized.includes(cmd))
+    if (hasPhraseMatch) return true
+
+    // 2. Clean punctuation and split the spoken text into individual words
+    const words = normalized.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "").split(/\s+/)
+    
+    // Define a set of emergency keywords that we want to match individually
+    const targetKeywords = new Set([
+      "help",
+      "sos",
+      "emergency",
+      "ambulance",
+      "police",
+      "save",
+      "accident",
+      "crash",
+      "activate",
+      "danger"
+    ])
+    
+    // Check if any single word spoken by the user is in our target keywords set
+    return words.some(word => targetKeywords.has(word))
   }, [])
 
   // Request microphone permission and start voice recognition

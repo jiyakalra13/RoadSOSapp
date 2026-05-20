@@ -481,11 +481,10 @@ export function HomeDashboard({
               </Button>
             ) : voiceEnabled ? (
               <div className="flex items-center justify-between w-full">
-                {/* Voice Prompts Scroll Banner or list */}
                 <div className="flex flex-col text-left">
-                  <span className="text-[9px] uppercase tracking-wider text-primary font-bold">Heard phrases:</span>
-                  <span className="text-[11px] font-medium text-foreground max-w-[180px] truncate">
-                    "Help me" • "Call ambulance" • "Emergency"
+                  <span className="text-[9px] uppercase tracking-wider text-primary font-bold">Status:</span>
+                  <span className="text-[11px] font-semibold text-primary animate-pulse">
+                    Monitoring Active...
                   </span>
                 </div>
                 
@@ -511,35 +510,6 @@ export function HomeDashboard({
               </div>
             )}
           </div>
-
-          {/* Quick Voice Command Prompts Banner */}
-          {micPermission === "granted" && (
-            <div className="flex flex-col gap-1.5 border-t border-border/40 pt-2">
-              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
-                Emergency Triggers Prompt:
-              </span>
-              <div className="flex flex-wrap gap-1">
-                <span className="text-[9px] bg-secondary/80 text-foreground px-2 py-0.5 rounded-full border border-border/30">
-                  "Help me"
-                </span>
-                <span className="text-[9px] bg-secondary/80 text-foreground px-2 py-0.5 rounded-full border border-border/30">
-                  "Call ambulance"
-                </span>
-                <span className="text-[9px] bg-secondary/80 text-foreground px-2 py-0.5 rounded-full border border-border/30">
-                  "RoadSOS activate"
-                </span>
-                <span className="text-[9px] bg-secondary/80 text-foreground px-2 py-0.5 rounded-full border border-border/30">
-                  "Emergency"
-                </span>
-                <span className="text-[9px] bg-secondary/80 text-foreground px-2 py-0.5 rounded-full border border-border/30">
-                  "Save me"
-                </span>
-                <span className="text-[9px] bg-destructive/10 text-destructive px-2 py-0.5 rounded-full border border-destructive/20 font-medium animate-pulse">
-                  Loud Scream 🔊
-                </span>
-              </div>
-            </div>
-          )}
         </Card>
       )}
 
