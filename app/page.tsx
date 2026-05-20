@@ -347,6 +347,7 @@ export default function RoadSOSApp() {
         bloodGroup={profile?.bloodGroup}
         medicalConditions={profile?.medicalConditions}
         allergies={profile?.allergies}
+        triggerType={sosTriggerType}
       />
 
       {/* Smart SOS Trigger Confirmation Overlay */}

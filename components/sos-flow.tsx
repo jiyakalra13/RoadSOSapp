@@ -65,6 +65,7 @@ interface SOSFlowProps {
   bloodGroup?: string
   medicalConditions?: string
   allergies?: string
+  triggerType?: "voice" | "volume" | "crash" | "shake" | null
 }
 
 type SOSStep = "countdown" | "sending" | "active"
@@ -93,7 +94,8 @@ export function SOSFlow({
   autoCalledAmbulance = false,
   bloodGroup,
   medicalConditions,
-  allergies
+  allergies,
+  triggerType = null
 }: SOSFlowProps) {
   const [step, setStep] = useState<SOSStep>("countdown")
   const [countdown, setCountdown] = useState(countdownDuration)
@@ -263,6 +265,10 @@ export function SOSFlow({
     }
 
     if (step === "countdown") {
+      if (triggerType) {
+        setStep("sending")
+        return
+      }
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -275,7 +281,7 @@ export function SOSFlow({
       }, 1000)
       return () => clearInterval(timer)
     }
-  }, [isActive, step])
+  }, [isActive, step, triggerType])
 
   // Handle the sending sequence separately
   useEffect(() => {
