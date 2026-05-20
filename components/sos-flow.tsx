@@ -331,7 +331,7 @@ export function SOSFlow({
         )}
         
         {step !== "countdown" && (
-          <div className="absolute inset-0 bg-emergency/95" />
+          <div className="absolute inset-0 bg-[#FF0D0D]" />
         )}
 
         <div className="relative h-full flex flex-col items-center justify-center px-6 text-emergency-foreground">
@@ -475,12 +475,12 @@ export function SOSFlow({
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col items-center text-center w-full overflow-y-auto max-h-full py-4 relative z-10"
+              className="flex flex-col items-center text-center w-full overflow-y-auto max-h-full py-4 relative z-10 animate-fade-in"
             >
               {/* Flashing Red Background for Active Mode */}
               <motion.div
                 animate={{ 
-                  backgroundColor: ["rgba(255,0,0,0)", "rgba(255,0,0,0.3)", "rgba(255,0,0,0)"]
+                  backgroundColor: ["rgba(255,0,0,0)", "rgba(255,0,0,0.1)", "rgba(255,0,0,0)"]
                 }}
                 transition={{ duration: 1.5, repeat: Infinity }}
                 className="fixed inset-0 pointer-events-none -z-10"
@@ -542,27 +542,27 @@ export function SOSFlow({
                 <motion.div 
                   animate={{ opacity: [1, 0.6, 1] }}
                   transition={{ duration: 1, repeat: Infinity }}
-                  className="bg-white/10 px-3 py-1 rounded-full"
+                  className="bg-white/10 px-3 py-1 rounded-full border border-white/10"
                 >
-                  <span className="text-[10px] font-medium">BROADCASTING</span>
+                  <span className="text-[10px] font-bold text-white tracking-wider">BROADCASTING</span>
                 </motion.div>
                 <div className={cn(
-                  "flex items-center gap-1 px-2 py-1 rounded-full text-[10px]",
-                  isOnline ? "bg-success/20" : "bg-warning/20"
+                  "flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] border border-white/10",
+                  isOnline ? "bg-success/20 text-white" : "bg-warning/20 text-white"
                 )}>
                   {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-                  {isOnline ? "Live" : "Offline"}
+                  <span className="font-bold tracking-wide">{isOnline ? "Live" : "Offline"}</span>
                 </div>
               </div>
               
-              <h2 className="text-xl font-bold mb-1">Help is coming</h2>
+              <h2 className="text-2xl font-extrabold mb-3 tracking-wide text-white">Help is coming</h2>
               
               {/* Auto-called ambulance indicator */}
               {autoCalledAmbulance && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5 mb-2"
+                  className="flex items-center gap-2 bg-white/20 border border-white/20 rounded-full px-3 py-1.5 mb-3"
                 >
                   <motion.div
                     animate={{ scale: [1, 1.2, 1] }}
@@ -570,36 +570,38 @@ export function SOSFlow({
                   >
                     <Phone className="h-4 w-4" />
                   </motion.div>
-                  <span className="text-xs font-medium">Calling Ambulance...</span>
+                  <span className="text-xs font-semibold">Calling Ambulance...</span>
                 </motion.div>
               )}
               
               {/* SMS Status */}
               {smsSent && emergencyContacts.length > 0 && (
-                <div className="flex items-center gap-1.5 mb-2">
-                  <MessageSquare className="h-3 w-3" />
-                  <span className="text-[10px] opacity-80">
+                <div className="flex items-center gap-1.5 mb-3 bg-white/10 border border-white/10 rounded-full px-3 py-1">
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  <span className="text-[10px] font-semibold opacity-90">
                     {isOnline ? "Live location sent to contacts" : "Last known location sent to contacts"}
                   </span>
                 </div>
               )}
               
               {(location || address) && (
-                <div className="bg-white/10 rounded-xl p-2.5 w-full max-w-xs mb-3">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 shrink-0" />
-                    <div className="text-left min-w-0 flex-1">
-                      <p className="text-[10px] opacity-70">
+                <div className="bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-2.5 w-full max-w-xs mb-4 flex items-center justify-between gap-3 text-left">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className="bg-white/10 p-1.5 rounded-lg shrink-0">
+                      <MapPin className="h-4 w-4 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-white/60">
                         {isOnline ? "Live Location" : "Last Known Location"}
                       </p>
-                      <p className="text-xs font-medium truncate">
+                      <p className="text-xs font-semibold text-white">
                         {address || `${location?.lat.toFixed(4)}, ${location?.lng.toFixed(4)}`}
                       </p>
                     </div>
-                    {isOnline && (
-                      <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
-                    )}
                   </div>
+                  {isOnline && (
+                    <div className="h-2.5 w-2.5 rounded-full bg-[#00e676] shrink-0 animate-pulse" />
+                  )}
                 </div>
               )}
 
@@ -608,15 +610,15 @@ export function SOSFlow({
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="w-full max-w-xs mb-3"
+                  className="w-full max-w-xs mb-4"
                 >
                   <button
                     onClick={() => setShowDetails(!showDetails)}
-                    className="w-full bg-white/10 rounded-xl p-3 flex items-center justify-between hover:bg-white/15 transition-colors"
+                    className="w-full bg-white/10 border border-white/10 rounded-xl p-3 flex items-center justify-between hover:bg-white/15 transition-colors text-white"
                   >
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4" />
-                      <span className="text-sm font-semibold">Personal Details</span>
+                      <span className="text-sm font-semibold">Personal Medical Details</span>
                     </div>
                     <motion.div
                       animate={{ rotate: showDetails ? 180 : 0 }}
@@ -635,14 +637,14 @@ export function SOSFlow({
                         transition={{ duration: 0.2 }}
                         className="overflow-hidden"
                       >
-                        <div className="bg-white/5 rounded-b-xl p-3 space-y-2 text-left border-t border-white/10 mt-0.5">
+                        <div className="bg-white/5 rounded-b-xl p-3 space-y-2 text-left border-t border-white/10 mt-0.5 text-white">
                           {/* Name */}
                           {userName && (
                             <div className="flex items-start gap-2">
-                              <User className="h-3 w-3 shrink-0 mt-0.5 opacity-70" />
+                              <User className="h-3 w-3 shrink-0 mt-0.5 opacity-75" />
                               <div>
-                                <p className="text-[10px] opacity-70">Name</p>
-                                <p className="text-xs font-medium">{userName}</p>
+                                <p className="text-[10px] opacity-75">Name</p>
+                                <p className="text-xs font-semibold">{userName}</p>
                               </div>
                             </div>
                           )}
@@ -650,10 +652,10 @@ export function SOSFlow({
                           {/* Blood Group */}
                           {bloodGroup && (
                             <div className="flex items-start gap-2">
-                              <Heart className="h-3 w-3 shrink-0 mt-0.5 opacity-70" />
+                              <Heart className="h-3 w-3 shrink-0 mt-0.5 opacity-75" />
                               <div>
-                                <p className="text-[10px] opacity-70">Blood Group</p>
-                                <p className="text-xs font-medium">{bloodGroup}</p>
+                                <p className="text-[10px] opacity-75">Blood Group</p>
+                                <p className="text-xs font-semibold text-emergency-500">{bloodGroup}</p>
                               </div>
                             </div>
                           )}
@@ -661,10 +663,10 @@ export function SOSFlow({
                           {/* Medical Conditions */}
                           {medicalConditions && (
                             <div className="flex items-start gap-2">
-                              <Pill className="h-3 w-3 shrink-0 mt-0.5 opacity-70" />
+                              <Pill className="h-3 w-3 shrink-0 mt-0.5 opacity-75" />
                               <div>
-                                <p className="text-[10px] opacity-70">Medical Conditions</p>
-                                <p className="text-xs font-medium">{medicalConditions}</p>
+                                <p className="text-[10px] opacity-75">Medical Conditions</p>
+                                <p className="text-xs font-semibold">{medicalConditions}</p>
                               </div>
                             </div>
                           )}
@@ -672,10 +674,10 @@ export function SOSFlow({
                           {/* Allergies */}
                           {allergies && (
                             <div className="flex items-start gap-2">
-                              <AlertCircle className="h-3 w-3 shrink-0 mt-0.5 opacity-70" />
+                              <AlertCircle className="h-3 w-3 shrink-0 mt-0.5 opacity-75" />
                               <div>
-                                <p className="text-[10px] opacity-70">Allergies</p>
-                                <p className="text-xs font-medium">{allergies}</p>
+                                <p className="text-[10px] opacity-75">Allergies</p>
+                                <p className="text-xs font-semibold">{allergies}</p>
                               </div>
                             </div>
                           )}
@@ -683,13 +685,13 @@ export function SOSFlow({
                           {/* Primary Emergency Contact */}
                           {emergencyContacts.length > 0 && (
                             <div className="flex items-start gap-2">
-                              <Phone className="h-3 w-3 shrink-0 mt-0.5 opacity-70" />
+                              <Phone className="h-3 w-3 shrink-0 mt-0.5 opacity-75" />
                               <div>
-                                <p className="text-[10px] opacity-70">Emergency Contact</p>
-                                <p className="text-xs font-medium">
+                                <p className="text-[10px] opacity-75">Emergency Contact</p>
+                                <p className="text-xs font-semibold">
                                   {emergencyContacts[0].name} ({emergencyContacts[0].relationship})
                                 </p>
-                                <p className="text-[10px] opacity-80">{emergencyContacts[0].phone}</p>
+                                <p className="text-[10px] opacity-90">{emergencyContacts[0].phone}</p>
                               </div>
                             </div>
                           )}
@@ -699,29 +701,11 @@ export function SOSFlow({
                   </AnimatePresence>
                 </motion.div>
               )}
-
-              {/* Send Location Update Button */}
-              {emergencyContacts.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => sendToAllContacts(
-                    emergencyContacts,
-                    location ? { lat: location.lat, lng: location.lng, address } : null,
-                    isOnline,
-                    userName
-                  )}
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white mb-3 text-xs"
-                >
-                  <Send className="h-3 w-3 mr-1.5" />
-                  Send Location Update
-                </Button>
-              )}
               
               {/* Emergency Services - Country Specific */}
-              <div className="w-full max-w-xs mb-3">
-                <p className="text-[10px] opacity-70 mb-2">Emergency Services</p>
-                <div className="grid grid-cols-3 gap-2">
+              <div className="w-full max-w-xs mb-4 text-left">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-white/70 mb-2.5">Emergency Services</p>
+                <div className="grid grid-cols-3 gap-2.5">
                   <CallButton 
                     icon={Ambulance} 
                     label={`Ambulance`}
@@ -743,11 +727,11 @@ export function SOSFlow({
                 </div>
               </div>
 
-              {/* Emergency Contacts */}
+              {/* Emergency Contacts List */}
               {emergencyContacts.length > 0 && (
-                <div className="w-full max-w-xs mb-3">
-                  <p className="text-[10px] opacity-70 mb-2">Your Emergency Contacts</p>
-                  <div className="grid grid-cols-3 gap-2">
+                <div className="w-full max-w-xs mb-4 text-left">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-white/70 mb-2.5">Emergency Contacts</p>
+                  <div className="grid grid-cols-3 gap-2.5">
                     {emergencyContacts.slice(0, 3).map(contact => (
                       <CallButton 
                         key={contact.id}
@@ -761,40 +745,41 @@ export function SOSFlow({
                 </div>
               )}
 
-              {emergencyContacts.length > 0 && (
-                <Button
-                  size="lg"
-                  onClick={() => {
-                    let locationToSend = location ? { lat: location.lat, lng: location.lng, address } : null
-                    if (!isOnline || !locationToSend) {
-                      const lastKnown = getLastKnownLocation()
-                      if (lastKnown) {
-                        locationToSend = lastKnown
+              {/* Action Buttons Section */}
+              <div className="w-full max-w-xs mt-3 flex flex-col gap-3">
+                {/* SHARE VIA SMS button if emergency contacts are saved */}
+                {emergencyContacts.length > 0 && (
+                  <Button
+                    onClick={() => {
+                      let locationToSend = location ? { lat: location.lat, lng: location.lng, address } : null
+                      if (!isOnline || !locationToSend) {
+                        const lastKnown = getLastKnownLocation()
+                        if (lastKnown) {
+                          locationToSend = lastKnown
+                        }
                       }
-                    }
-                    sendToAllContactsRef.current(
-                      emergencyContacts,
-                      locationToSend,
-                      isOnline,
-                      userName,
-                      { bloodGroup, conditions: medicalConditions, allergies }
-                    )
-                  }}
-                  className="bg-white text-destructive hover:bg-white/90 mt-2 w-full max-w-xs font-bold text-lg h-14 uppercase tracking-wider"
+                      sendToAllContactsRef.current(
+                        emergencyContacts,
+                        locationToSend,
+                        isOnline,
+                        userName,
+                        { bloodGroup, conditions: medicalConditions, allergies }
+                      )
+                    }}
+                    className="w-full h-12 bg-white text-[#FF0D0D] hover:bg-white/95 font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center justify-center gap-2 transition-all duration-300 animate-pulse"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    Share via SMS
+                  </Button>
+                )}
+
+                <Button
+                  onClick={onCancel}
+                  className="w-full h-14 bg-[#FF0D0D] border-2 border-white/20 text-white hover:bg-[#E50000] font-black text-sm uppercase tracking-widest rounded-xl transition-all duration-300 shadow-lg"
                 >
-                  <MessageSquare className="h-5 w-5 mr-2" />
-                  SHARE VIA SMS
+                  STOP SOS
                 </Button>
-              )}
-              
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={onCancel}
-                className="bg-destructive border-destructive text-destructive-foreground hover:bg-destructive/90 hover:text-destructive-foreground mt-2 w-full max-w-xs font-bold text-lg h-14 uppercase tracking-wider"
-              >
-                STOP SOS
-              </Button>
+              </div>
             </motion.div>
           )}
         </div>
@@ -850,13 +835,15 @@ function CallButton({
   return (
     <button 
       onClick={() => callPhone(phone)}
-      className="flex flex-col items-center gap-1 p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-colors"
+      className="flex flex-col items-center justify-center gap-1.5 p-3 bg-white/10 border border-white/20 rounded-2xl hover:bg-white/15 transition-all duration-300 w-full"
     >
-      <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
-        <Icon className="h-4 w-4" />
+      <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center shadow-md">
+        <Icon className="h-4 w-4 text-[#FF0D0D]" />
       </div>
-      <span className="text-[10px] font-medium truncate max-w-full">{label}</span>
-      {sublabel && <span className="text-[9px] opacity-70">{sublabel}</span>}
+      <div className="flex flex-col items-center">
+        <span className="text-[10px] font-bold text-white tracking-wide truncate max-w-full">{label}</span>
+        {sublabel && <span className="text-[9px] font-medium text-white/70 mt-0.5">{sublabel}</span>}
+      </div>
     </button>
   )
 }
