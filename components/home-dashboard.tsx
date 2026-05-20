@@ -533,28 +533,46 @@ export function HomeDashboard({
             </div>
           </div>
 
-          {/* Live speech transcription in the gap area */}
-          {isVoiceListening && micPermission === "granted" && (
-            <div className="mx-0.5 mb-2.5 px-3 py-2 rounded-lg bg-primary/5 border border-primary/10 flex items-center justify-between text-xs animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Detected Speech:</span>
-              </div>
-              <span className={cn(
-                "text-[11px] max-w-[200px] truncate transition-all duration-300",
-                spokenText 
-                  ? "text-primary font-semibold animate-pulse" 
-                  : "text-muted-foreground/55 italic"
-              )}>
-                {spokenText ? `"${spokenText}"` : "Waiting for voice input..."}
+          {/* Live speech transcription in the gap area - ALWAYS VISIBLE */}
+          <div className="mx-0.5 mb-2.5 px-3 py-2 rounded-lg bg-primary/5 border border-primary/10 flex items-center justify-between text-xs transition-all duration-300">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                {isVoiceListening && micPermission === "granted" ? (
+                  <>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </>
+                ) : (
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-muted-foreground/45"></span>
+                )}
               </span>
+              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Detected Speech:</span>
             </div>
-          )}
+            <span className={cn(
+              "text-[11px] max-w-[200px] truncate transition-all duration-300",
+              !voiceEnabled
+                ? "text-muted-foreground/40 italic"
+                : micPermission !== "granted"
+                  ? "text-destructive/60 font-semibold"
+                  : isVoiceListening
+                    ? spokenText 
+                      ? "text-primary font-semibold animate-pulse" 
+                      : "text-muted-foreground/55 italic"
+                    : "text-muted-foreground/45 italic"
+            )}>
+              {!voiceEnabled
+                ? "Disabled in Settings"
+                : micPermission !== "granted"
+                  ? "Mic Access Required"
+                  : isVoiceListening
+                    ? spokenText 
+                      ? `"${spokenText}"` 
+                      : 'Listening... (say "Help me")'
+                    : "Connecting..."}
+            </span>
+          </div>
 
-          {/* Real-time Waveform Visualizer */}
+          {/* Real-time Waveform Visualizer - ALWAYS VISIBLE */}
           <div className="bg-secondary/40 backdrop-blur-sm rounded-lg p-2.5 mb-2.5 flex items-center justify-between min-h-[3.5rem]">
             {micPermission === "denied" ? (
               <Button 
@@ -574,7 +592,7 @@ export function HomeDashboard({
               >
                 Enable Listening Mode
               </Button>
-            ) : isVoiceListening ? (
+            ) : voiceEnabled ? (
               <div className="flex items-center justify-between w-full">
                 {/* Voice Prompts Scroll Banner or list */}
                 <div className="flex flex-col text-left">
@@ -587,7 +605,7 @@ export function HomeDashboard({
                 {/* Waveform graphic */}
                 <div className="flex items-center gap-[3px] h-8 px-2">
                   {[0.3, 0.6, 0.9, 0.7, 0.4, 0.8, 0.5, 0.3].map((factor, idx) => {
-                    const height = Math.max(4, Math.round(audioLevel * 28 * factor));
+                    const height = isVoiceListening ? Math.max(4, Math.round(audioLevel * 28 * factor)) : 4;
                     return (
                       <motion.div
                         key={idx}

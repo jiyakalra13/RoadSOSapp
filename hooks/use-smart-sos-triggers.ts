@@ -30,6 +30,11 @@ const SOS_VOICE_COMMANDS = [
   "call police",
   "i need help",
   "sos",
+  "s.o.s.",
+  "s o s",
+  "road sos",
+  "roadsos",
+  "please help",
   "save me",
   "accident",
   "crash",
@@ -427,9 +432,10 @@ export function useSmartSOSTriggers({
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.log("[v0] Voice recognition error:", event.error)
-      consecutiveErrorsRef.current++
       
-      if (event.error !== "no-speech" && event.error !== "aborted") {
+      // Only treat unexpected errors as consecutive failures
+      if (event.error !== "no-speech" && event.error !== "aborted" && event.error !== "audio-capture") {
+        consecutiveErrorsRef.current++
         setIsSpeechListening(false)
       }
       
@@ -448,18 +454,13 @@ export function useSmartSOSTriggers({
         clearTimeout(restartTimeoutRef.current)
       }
       
-      if (shouldListenRef.current && settings.voiceCommandEnabled && enabled && consecutiveErrorsRef.current < maxConsecutiveErrors) {
+      if (shouldListenRef.current && settings.voiceCommandEnabled && enabled) {
         restartTimeoutRef.current = setTimeout(() => {
           try {
             console.log("[v0] Restarting voice recognition...")
             recognition.start()
           } catch (e) {
             console.log("[v0] Restart error:", e)
-            consecutiveErrorsRef.current++
-            if (consecutiveErrorsRef.current >= maxConsecutiveErrors) {
-              console.log("[v0] Too many consecutive errors, stopping voice recognition")
-              shouldListenRef.current = false
-            }
           }
         }, 300)
       }
