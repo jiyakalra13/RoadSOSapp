@@ -11,7 +11,6 @@ import {
   AlertTriangle,
   Loader2,
   RefreshCw,
-  Building2,
   Mic,
   Footprints,
   PhoneCall
@@ -19,7 +18,6 @@ import {
 import { cn } from "@/lib/utils"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { useAllNearbyServices, type NearbyPlace } from "@/hooks/use-nearby-places"
 
 interface HomeDashboardProps {
   onSOSPress: () => void
@@ -101,32 +99,6 @@ export function HomeDashboard({
   const [pressTimer, setPressTimer] = useState<NodeJS.Timeout | null>(null)
   const [pressProgress, setPressProgress] = useState(0)
 
-  // Fetch nearby services based on user's real location
-  const { hospitals, police, mechanics, loading: servicesLoading } = useAllNearbyServices(
-    location?.lat ?? null,
-    location?.lng ?? null
-  )
-
-  // Get the nearest service of each type
-  const nearestHospital = hospitals[0]
-  const nearestPolice = police[0]
-  const nearestMechanic = mechanics[0]
-
-  // Helper functions
-  const formatDistance = (km: number): string => {
-    if (km < 1) return `${Math.round(km * 1000)} m`
-    return `${km.toFixed(1)} km`
-  }
-
-  const openGoogleMaps = (place: NearbyPlace) => {
-    let url: string
-    if (location) {
-      url = `https://www.google.com/maps/dir/?api=1&origin=${location.lat},${location.lng}&destination=${place.lat},${place.lon}&travelmode=driving`
-    } else {
-      url = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lon}&travelmode=driving`
-    }
-    window.open(url, "_blank")
-  }
 
   const callPhone = (phone: string) => {
     window.location.href = `tel:${phone}`
@@ -223,105 +195,7 @@ export function HomeDashboard({
         </div>
       </Card>
 
-      {/* Nearby Services Summary */}
-      {location && (
-        <div className="mb-3 shrink-0">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-xs font-semibold text-foreground">Nearby Services</h2>
-            {servicesLoading && (
-              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-            )}
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {/* Nearest Hospital */}
-            <Card 
-              className={cn(
-                "p-2 border-border/50 cursor-pointer hover:bg-accent/50 transition-colors",
-                !nearestHospital && "opacity-50"
-              )}
-              onClick={() => nearestHospital && onServiceSelect("ambulance")}
-            >
-              <div className="flex items-center gap-1.5 mb-1">
-                <div className="h-5 w-5 rounded bg-emergency/10 flex items-center justify-center">
-                  <Building2 className="h-3 w-3 text-emergency" />
-                </div>
-                <span className="text-[10px] font-medium text-foreground truncate">Hospital</span>
-              </div>
-              {servicesLoading ? (
-                <p className="text-[10px] text-muted-foreground">Searching...</p>
-              ) : nearestHospital ? (
-                <div>
-                  <p className="text-[10px] text-muted-foreground truncate">{nearestHospital.name}</p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <MapPin className="h-2.5 w-2.5 text-muted-foreground" />
-                    <span className="text-[10px] font-medium text-primary">{formatDistance(nearestHospital.distance)}</span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-[10px] text-muted-foreground">None found</p>
-              )}
-            </Card>
 
-            {/* Nearest Police */}
-            <Card 
-              className={cn(
-                "p-2 border-border/50 cursor-pointer hover:bg-accent/50 transition-colors",
-                !nearestPolice && "opacity-50"
-              )}
-              onClick={() => nearestPolice && onServiceSelect("police")}
-            >
-              <div className="flex items-center gap-1.5 mb-1">
-                <div className="h-5 w-5 rounded bg-indigo-500/10 flex items-center justify-center">
-                  <Shield className="h-3 w-3 text-indigo-500" />
-                </div>
-                <span className="text-[10px] font-medium text-foreground truncate">Police</span>
-              </div>
-              {servicesLoading ? (
-                <p className="text-[10px] text-muted-foreground">Searching...</p>
-              ) : nearestPolice ? (
-                <div>
-                  <p className="text-[10px] text-muted-foreground truncate">{nearestPolice.name}</p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <MapPin className="h-2.5 w-2.5 text-muted-foreground" />
-                    <span className="text-[10px] font-medium text-primary">{formatDistance(nearestPolice.distance)}</span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-[10px] text-muted-foreground">None found</p>
-              )}
-            </Card>
-
-            {/* Nearest Mechanic */}
-            <Card 
-              className={cn(
-                "p-2 border-border/50 cursor-pointer hover:bg-accent/50 transition-colors",
-                !nearestMechanic && "opacity-50"
-              )}
-              onClick={() => nearestMechanic && onServiceSelect("vehicle")}
-            >
-              <div className="flex items-center gap-1.5 mb-1">
-                <div className="h-5 w-5 rounded bg-blue-500/10 flex items-center justify-center">
-                  <Car className="h-3 w-3 text-blue-500" />
-                </div>
-                <span className="text-[10px] font-medium text-foreground truncate">Mechanic</span>
-              </div>
-              {servicesLoading ? (
-                <p className="text-[10px] text-muted-foreground">Searching...</p>
-              ) : nearestMechanic ? (
-                <div>
-                  <p className="text-[10px] text-muted-foreground truncate">{nearestMechanic.name}</p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <MapPin className="h-2.5 w-2.5 text-muted-foreground" />
-                    <span className="text-[10px] font-medium text-primary">{formatDistance(nearestMechanic.distance)}</span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-[10px] text-muted-foreground">None found</p>
-              )}
-            </Card>
-          </div>
-        </div>
-      )}
 
       {/* SOS Button */}
       <div className="flex-1 flex flex-col items-center justify-center">
