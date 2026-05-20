@@ -127,6 +127,8 @@ export function SOSFlow({
   } = useEmergencySMS()
   
   const hasSentInitialSmsRef = useRef(false)
+  const hasCalledAmbulanceRef = useRef(false)
+  const hasCalledContactRef = useRef(false)
 
   // Start/stop effects and live updates based on SOS state
   useEffect(() => {
@@ -256,6 +258,8 @@ export function SOSFlow({
       setShowDetails(false)
       setDetailsUnlocked(false)
       hasSentInitialSmsRef.current = false
+      hasCalledAmbulanceRef.current = false
+      hasCalledContactRef.current = false
       resetSmsRef.current()
       stopEffects() // Stop sounds and vibration
       if (typeof window !== "undefined" && window.speechSynthesis) {
@@ -282,6 +286,52 @@ export function SOSFlow({
       return () => clearInterval(timer)
     }
   }, [isActive, step, triggerType])
+
+  // Automatic Emergency Calls Trigger (Ambulance followed by Primary Emergency Contact)
+  useEffect(() => {
+    if (!isActive || step !== "active") return
+
+    const handleAutoCalls = () => {
+      if (!hasCalledAmbulanceRef.current) {
+        hasCalledAmbulanceRef.current = true
+        // Speak notification before dialing
+        speak("Calling ambulance now.")
+        setTimeout(() => {
+          callPhone(emergencyNumbers.ambulance)
+        }, 1000)
+      } else if (
+        hasCalledAmbulanceRef.current &&
+        !hasCalledContactRef.current &&
+        emergencyContacts.length > 0 &&
+        emergencyContacts[0].phone
+      ) {
+        hasCalledContactRef.current = true
+        // Speak notification before dialing
+        speak(`Calling emergency contact, ${emergencyContacts[0].name.split(" ")[0]}, now.`)
+        setTimeout(() => {
+          callPhone(emergencyContacts[0].phone)
+        }, 1000)
+      }
+    }
+
+    // Run immediately when active
+    handleAutoCalls()
+
+    // Run again when user returns to the app
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        handleAutoCalls()
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("focus", handleAutoCalls)
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("focus", handleAutoCalls)
+    }
+  }, [isActive, step, emergencyNumbers.ambulance, emergencyContacts])
 
   // Handle the sending sequence separately
   useEffect(() => {
