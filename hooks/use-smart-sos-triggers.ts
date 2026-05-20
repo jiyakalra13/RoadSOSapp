@@ -45,6 +45,7 @@ interface SmartSOSTriggersResult {
   settings: SmartTriggerSettings
   updateSettings: (settings: Partial<SmartTriggerSettings>) => void
   isVoiceListening: boolean
+  spokenText: string
   startVoiceListening: () => void
   stopVoiceListening: () => void
   lastDetectedCommand: string | null
@@ -106,9 +107,11 @@ export function useSmartSOSTriggers({
   const [isAudioListening, setIsAudioListening] = useState(false)
   const [isSpeechListening, setIsSpeechListening] = useState(false)
   const isVoiceListening = isAudioListening || isSpeechListening
+  const [spokenText, setSpokenText] = useState<string>("")
   const [lastDetectedCommand, setLastDetectedCommand] = useState<string | null>(null)
   const [audioLevel, setAudioLevel] = useState<number>(0)
   const [micPermission, setMicPermission] = useState<"prompt" | "granted" | "denied">("prompt")
+  const transcriptTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [isSupported, setIsSupported] = useState({
     voice: false,
     volume: true, // Volume detection via keydown is widely supported
@@ -372,6 +375,28 @@ export function useSmartSOSTriggers({
     }
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let finalTranscript = ""
+      let interimTranscript = ""
+      
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i]
+        const transcript = result[0].transcript
+        if (result.isFinal) {
+          finalTranscript += transcript
+        } else {
+          interimTranscript += transcript
+        }
+      }
+
+      const currentSpeech = interimTranscript || finalTranscript
+      if (currentSpeech.trim()) {
+        setSpokenText(currentSpeech.trim())
+        if (transcriptTimeoutRef.current) clearTimeout(transcriptTimeoutRef.current)
+        transcriptTimeoutRef.current = setTimeout(() => {
+          setSpokenText("")
+        }, 3000)
+      }
+
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i]
         const transcript = result[0].transcript
@@ -380,6 +405,7 @@ export function useSmartSOSTriggers({
         if (checkForSOSCommand(transcript)) {
           console.log("[v0] SOS COMMAND DETECTED:", transcript)
           setLastDetectedCommand(transcript)
+          setSpokenText(transcript)
           shouldListenRef.current = false
           onTriggerRef.current("voice", transcript)
           recognition.stop()
@@ -617,6 +643,7 @@ export function useSmartSOSTriggers({
     settings,
     updateSettings,
     isVoiceListening,
+    spokenText,
     startVoiceListening,
     stopVoiceListening,
     lastDetectedCommand,

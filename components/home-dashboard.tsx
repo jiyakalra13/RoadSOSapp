@@ -33,6 +33,7 @@ interface HomeDashboardProps {
   address?: string
   accuracy?: number
   isVoiceListening?: boolean
+  spokenText?: string
   voiceEnabled?: boolean
   micPermission?: "prompt" | "granted" | "denied"
   onRequestMicPermission?: () => void
@@ -87,6 +88,7 @@ export function HomeDashboard({
   address,
   accuracy,
   isVoiceListening,
+  spokenText = "",
   voiceEnabled,
   micPermission,
   onRequestMicPermission,
@@ -530,6 +532,27 @@ export function HomeDashboard({
               <Mic className="h-4 w-4" />
             </div>
           </div>
+
+          {/* Live speech transcription in the gap area */}
+          {isVoiceListening && micPermission === "granted" && (
+            <div className="mx-0.5 mb-2.5 px-3 py-2 rounded-lg bg-primary/5 border border-primary/10 flex items-center justify-between text-xs animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Detected Speech:</span>
+              </div>
+              <span className={cn(
+                "text-[11px] max-w-[200px] truncate transition-all duration-300",
+                spokenText 
+                  ? "text-primary font-semibold animate-pulse" 
+                  : "text-muted-foreground/55 italic"
+              )}>
+                {spokenText ? `"${spokenText}"` : "Waiting for voice input..."}
+              </span>
+            </div>
+          )}
 
           {/* Real-time Waveform Visualizer */}
           <div className="bg-secondary/40 backdrop-blur-sm rounded-lg p-2.5 mb-2.5 flex items-center justify-between min-h-[3.5rem]">

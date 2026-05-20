@@ -117,6 +117,7 @@ export default function RoadSOSApp() {
   const { 
     lastDetectedCommand, 
     isVoiceListening, 
+    spokenText,
     settings: smartTriggerSettings, 
     micPermission, 
     requestMicrophonePermission,
@@ -215,6 +216,7 @@ export default function RoadSOSApp() {
             address={gpsLocation?.address}
             accuracy={gpsLocation?.accuracy}
             isVoiceListening={isVoiceListening}
+            spokenText={spokenText}
             voiceEnabled={smartTriggerSettings.voiceCommandEnabled}
             micPermission={micPermission}
             onRequestMicPermission={requestMicrophonePermission}
