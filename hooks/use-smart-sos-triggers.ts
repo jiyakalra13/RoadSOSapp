@@ -114,6 +114,7 @@ export function useSmartSOSTriggers({
 
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const volumePressTimesRef = useRef<number[]>([])
+  const isResettingVolumeRef = useRef(false)
   const onTriggerRef = useRef(onTrigger)
 
   // Track if voice recognition should be running
@@ -345,9 +346,15 @@ export function useSmartSOSTriggers({
     document.addEventListener("click", startAudio)
 
     const handleVolumeChange = () => {
+      // If this event was fired because WE reset the volume, ignore it
+      if (isResettingVolumeRef.current) {
+        isResettingVolumeRef.current = false
+        return
+      }
+
       // Reset volume to 0.5 so we can keep detecting changes in the same direction
-      // Don't reset if it's already 0.5 to prevent infinite loops
       if (audio.volume !== 0.5) {
+        isResettingVolumeRef.current = true
         audio.volume = 0.5
       }
 
