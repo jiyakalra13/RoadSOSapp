@@ -7,6 +7,7 @@ export interface DangerZoneCheckResult {
   riskLevel: "high" | "medium" | "low"
   confidence: number
   zoneName: string
+  isTransitionToSafe?: boolean
 }
 
 export function useDangerZones(
@@ -17,6 +18,7 @@ export function useDangerZones(
   const [isChecking, setIsChecking] = useState(false)
   
   const lastAlertTimeRef = useRef<number>(0)
+  const wasInDangerZoneRef = useRef<boolean>(false)
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const cooldownDuration = 60 * 1000 // 60 seconds cooldown to avoid voice spam
   const alertDuration = 8 * 1000 // 8 seconds alert duration
@@ -43,41 +45,81 @@ export function useDangerZones(
         
         const data = await response.json()
         
-        if (data.success && data.inDangerZone && data.riskLevel === "high") {
-          const now = Date.now()
-          if (now - lastAlertTimeRef.current > cooldownDuration) {
-            // Trigger new warning alert
-            lastAlertTimeRef.current = now
-            
-            const warningInfo: DangerZoneCheckResult = {
-              inDangerZone: data.inDangerZone,
-              riskLevel: data.riskLevel,
-              confidence: data.confidence,
-              zoneName: data.zoneName
-            }
-            
-            setActiveWarning(warningInfo)
-            
-            // Speak alert automatically
-            if (typeof window !== "undefined" && window.speechSynthesis) {
-              window.speechSynthesis.cancel()
-              const utterance = new SpeechSynthesisUtterance(
-                "Accident prone area detected. Please stay alert."
-              )
-              utterance.rate = 0.95
-              utterance.pitch = 1.0
-              window.speechSynthesis.speak(utterance)
-            }
+        if (data.success) {
+          const isHighRisk = data.inDangerZone && data.riskLevel === "high"
+          
+          if (isHighRisk) {
+            const now = Date.now()
+            if (now - lastAlertTimeRef.current > cooldownDuration) {
+              // Trigger new warning alert
+              lastAlertTimeRef.current = now
+              wasInDangerZoneRef.current = true // Record that we entered a danger zone
+              
+              const warningInfo: DangerZoneCheckResult = {
+                inDangerZone: data.inDangerZone,
+                riskLevel: data.riskLevel,
+                confidence: data.confidence,
+                zoneName: data.zoneName,
+                isTransitionToSafe: false
+              }
+              
+              setActiveWarning(warningInfo)
+              
+              // Speak alert automatically
+              if (typeof window !== "undefined" && window.speechSynthesis) {
+                window.speechSynthesis.cancel()
+                const utterance = new SpeechSynthesisUtterance(
+                  "Accident prone area detected. Please stay alert."
+                )
+                utterance.rate = 0.95
+                utterance.pitch = 1.0
+                window.speechSynthesis.speak(utterance)
+              }
 
-            // Clear any active warning timeout
-            if (warningTimeoutRef.current) {
-              clearTimeout(warningTimeoutRef.current)
-            }
+              // Clear any active warning timeout
+              if (warningTimeoutRef.current) {
+                clearTimeout(warningTimeoutRef.current)
+              }
 
-            // Warning is visible for exactly 8 seconds
-            warningTimeoutRef.current = setTimeout(() => {
-              setActiveWarning(null)
-            }, alertDuration)
+              // Warning is visible for exactly 8 seconds
+              warningTimeoutRef.current = setTimeout(() => {
+                setActiveWarning(null)
+              }, alertDuration)
+            }
+          } else {
+            // User is currently safe. Did they just transition out of a danger zone?
+            if (wasInDangerZoneRef.current) {
+              wasInDangerZoneRef.current = false // Reset transition flag
+              
+              const safeInfo: DangerZoneCheckResult = {
+                inDangerZone: false,
+                riskLevel: "low",
+                confidence: 0,
+                zoneName: "Safe Zone",
+                isTransitionToSafe: true
+              }
+              
+              setActiveWarning(safeInfo)
+              
+              // Speak transition alert: "In safe area now"
+              if (typeof window !== "undefined" && window.speechSynthesis) {
+                window.speechSynthesis.cancel()
+                const utterance = new SpeechSynthesisUtterance("In safe area now.")
+                utterance.rate = 0.95
+                utterance.pitch = 1.0
+                window.speechSynthesis.speak(utterance)
+              }
+
+              // Clear any active warning timeout
+              if (warningTimeoutRef.current) {
+                clearTimeout(warningTimeoutRef.current)
+              }
+
+              // Warning is visible for exactly 8 seconds
+              warningTimeoutRef.current = setTimeout(() => {
+                setActiveWarning(null)
+              }, alertDuration)
+            }
           }
         }
       } catch (err) {

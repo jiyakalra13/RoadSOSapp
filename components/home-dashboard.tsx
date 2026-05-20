@@ -152,31 +152,52 @@ export function HomeDashboard({
             transition={{ type: "spring", stiffness: 350, damping: 25 }}
             className="absolute top-4 left-4 right-4 z-50 pointer-events-none"
           >
-            <div className="bg-destructive/95 backdrop-blur-lg border border-warning/50 text-white rounded-xl p-4 shadow-[0_0_25px_rgba(239,68,68,0.4)] flex items-start gap-3 pointer-events-auto relative overflow-hidden animate-pulse">
-              {/* Warning Glow Effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 via-yellow-500/20 to-red-500/20 mix-blend-overlay animate-[spin_4s_linear_infinite]" />
-              
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 text-yellow-300 animate-bounce">
-                <AlertTriangle className="h-5 w-5 fill-current" />
-              </div>
-              
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-bold text-white tracking-wide uppercase">
-                  ⚠️ Accident-Prone Area Ahead
-                </h4>
-                <p className="text-xs text-white/90 font-medium mt-0.5">
-                  Please stay alert and drive carefully.
-                </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-[9px] bg-yellow-500/30 border border-yellow-400/40 text-yellow-200 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                    {activeWarning.zoneName}
-                  </span>
-                  <span className="text-[9px] bg-red-500/30 border border-red-400/40 text-red-200 px-2 py-0.5 rounded-full font-bold">
-                    Risk Score: {Math.round(activeWarning.confidence * 100)}%
-                  </span>
+            {activeWarning.isTransitionToSafe ? (
+              /* Green Safe Zone Alert Card */
+              <div className="bg-emerald-600/95 backdrop-blur-lg border border-emerald-400/50 text-white rounded-xl p-4 shadow-[0_0_25px_rgba(16,185,129,0.4)] flex items-start gap-3 pointer-events-auto relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-emerald-500/20 mix-blend-overlay" />
+                
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 text-emerald-200">
+                  <Shield className="h-5 w-5 fill-current" />
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-bold text-white tracking-wide uppercase">
+                    💚 Safe Area Reached
+                  </h4>
+                  <p className="text-xs text-white/95 font-medium mt-0.5 font-semibold">
+                    In safe area now.
+                  </p>
                 </div>
               </div>
-            </div>
+            ) : (
+              /* Red/Yellow Danger Zone Alert Card */
+              <div className="bg-destructive/95 backdrop-blur-lg border border-warning/50 text-white rounded-xl p-4 shadow-[0_0_25px_rgba(239,68,68,0.4)] flex items-start gap-3 pointer-events-auto relative overflow-hidden animate-pulse">
+                {/* Warning Glow Effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 via-yellow-500/20 to-red-500/20 mix-blend-overlay animate-[spin_4s_linear_infinite]" />
+                
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 text-yellow-300 animate-bounce">
+                  <AlertTriangle className="h-5 w-5 fill-current" />
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-bold text-white tracking-wide uppercase">
+                    ⚠️ Accident-Prone Area Ahead
+                  </h4>
+                  <p className="text-xs text-white/90 font-medium mt-0.5">
+                    Please stay alert and drive carefully.
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-[9px] bg-yellow-500/30 border border-yellow-400/40 text-yellow-200 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                      {activeWarning.zoneName}
+                    </span>
+                    <span className="text-[9px] bg-red-500/30 border border-red-400/40 text-red-200 px-2 py-0.5 rounded-full font-bold">
+                      Risk Score: {Math.round(activeWarning.confidence * 100)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -192,8 +213,10 @@ export function HomeDashboard({
       {/* Location Status */}
       <Card className={cn(
         "p-3 mb-3 bg-card/85 backdrop-blur-md shrink-0 transition-all duration-300",
-        activeWarning 
-          ? "border-destructive shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse" 
+        activeWarning && !activeWarning.isTransitionToSafe
+          ? "border-destructive shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse"
+          : activeWarning && activeWarning.isTransitionToSafe
+          ? "border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
           : "border-border/50"
       )}>
         <div className="flex items-center gap-3">
