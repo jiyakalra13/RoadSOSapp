@@ -17,6 +17,7 @@ interface ServicesOverviewProps {
   onBack: () => void
   onSelectService: (service: "ambulance" | "police" | "vehicle") => void
   location: { lat: number; lng: number } | null
+  address?: string
 }
 
 const services = [
@@ -52,7 +53,7 @@ const services = [
   }
 ]
 
-export function ServicesOverview({ onBack, onSelectService, location }: ServicesOverviewProps) {
+export function ServicesOverview({ onBack, onSelectService, location, address }: ServicesOverviewProps) {
   return (
     <div className="flex flex-col h-[calc(100vh-7.5rem)] bg-background overflow-hidden">
       {/* Header */}
@@ -78,11 +79,15 @@ export function ServicesOverview({ onBack, onSelectService, location }: Services
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center">
             <MapPin className="h-5 w-5 mx-auto mb-1 text-muted-foreground/50" />
-            {location && (
+            {address ? (
+              <p className="text-xs text-muted-foreground font-medium px-4">
+                {address}
+              </p>
+            ) : location ? (
               <p className="text-[10px] text-muted-foreground">
                 {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
               </p>
-            )}
+            ) : null}
           </div>
         </div>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -99,7 +104,7 @@ export function ServicesOverview({ onBack, onSelectService, location }: Services
               key={service.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
+              transition={{ delay: index * 0.02 }}
             >
               <Card
                 className="p-3 cursor-pointer hover:shadow-md transition-all border-border/50"

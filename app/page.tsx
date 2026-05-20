@@ -220,6 +220,7 @@ export default function RoadSOSApp() {
             onBack={handleBack}
             onSelectService={(service) => setActiveView(`services-${service}` as ActiveView)}
             location={location}
+            address={gpsLocation?.address}
           />
         )
       case "services-ambulance":
