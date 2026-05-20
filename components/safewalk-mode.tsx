@@ -8,11 +8,16 @@ import {
   ShieldCheck, 
   Clock, 
   Footprints,
-  AlertTriangle
+  AlertTriangle,
+  MessageSquare,
+  Send,
+  Loader2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { useUserProfile } from "@/hooks/use-user-profile"
+import { useEmergencySMS } from "@/hooks/use-emergency-sms"
 
 interface SafeWalkModeProps {
   onBack: () => void
@@ -22,7 +27,29 @@ interface SafeWalkModeProps {
 }
 
 export function SafeWalkMode({ onBack, location, locationLoading, isOnline }: SafeWalkModeProps) {
+  const { profile } = useUserProfile()
+  const { sendToAllContacts, isSending } = useEmergencySMS()
   const [elapsedTime, setElapsedTime] = useState(0)
+
+  const handleShareSMS = async () => {
+    if (!profile?.emergencyContacts || profile.emergencyContacts.length === 0 || !location) return
+    
+    try {
+      await sendToAllContacts(
+        profile.emergencyContacts,
+        location,
+        isOnline,
+        profile.fullName,
+        {
+          bloodGroup: profile.bloodGroup,
+          conditions: profile.medicalConditions,
+          allergies: profile.allergies
+        }
+      )
+    } catch (err) {
+      console.error("Failed to share location via SMS:", err)
+    }
+  }
 
   // Timer for travel duration
   useEffect(() => {
@@ -111,6 +138,64 @@ export function SafeWalkMode({ onBack, location, locationLoading, isOnline }: Sa
               {locationLoading ? "Acquiring satellite lock..." : location ? "Live location actively monitored" : "Waiting for GPS signal"}
             </p>
           </div>
+        </Card>
+
+        {/* SMS Live Location Sharing Option */}
+        <Card className="p-4 border-border/50 bg-card/60 backdrop-blur-sm shadow-sm flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col text-left">
+              <h3 className="text-xs font-bold text-foreground">Share Live Location</h3>
+              <p className="text-[10px] text-muted-foreground">Notify emergency contacts via SMS</p>
+            </div>
+            <MessageSquare className="h-4 w-4 text-primary" />
+          </div>
+
+          {profile?.emergencyContacts && profile.emergencyContacts.length > 0 ? (
+            <div className="flex flex-col gap-2.5">
+              <div className="flex flex-wrap gap-1.5 max-h-[4.5rem] overflow-y-auto pr-1">
+                {profile.emergencyContacts.map((contact) => (
+                  <div 
+                    key={contact.id} 
+                    className="text-[9px] bg-secondary/80 text-foreground px-2 py-0.5 rounded-full border border-border/30 flex items-center gap-1 font-medium"
+                  >
+                    <span className="h-1 w-1 bg-emerald-500 rounded-full"></span>
+                    {contact.name} ({contact.relationship})
+                  </div>
+                ))}
+              </div>
+              <Button 
+                onClick={handleShareSMS}
+                disabled={isSending || !location}
+                className="w-full h-8 text-[11px] font-semibold bg-primary hover:bg-primary/95 text-white flex items-center justify-center gap-2 rounded-lg"
+              >
+                {isSending ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Opening SMS app...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-3 w-3" />
+                    Share Location via SMS
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : (
+            <div className="text-center py-2 bg-secondary/20 rounded-lg border border-dashed border-border/40">
+              <p className="text-[10px] text-muted-foreground mb-1.5">No emergency contacts configured.</p>
+              <Button 
+                variant="link" 
+                size="sm" 
+                onClick={() => {
+                  alert("Please add emergency contacts in your Profile settings.")
+                }}
+                className="h-auto p-0 text-[10px] font-bold text-primary"
+              >
+                Configure Contacts
+              </Button>
+            </div>
+          )}
         </Card>
 
         {/* Instructions */}
